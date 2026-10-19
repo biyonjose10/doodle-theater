@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from . import pipeline, story
+from .story import agent, voice
 from .config import STATIC, public_url
 from .store import Store
 
@@ -155,10 +156,14 @@ async def new_story(body: StoryRequest):
     everyone = {c["id"]: c for c in store.cast()}
     chosen = [everyone[i] for i in body.cast if i in everyone] or list(everyone.values())[-3:]
     try:
-        return await run_in_threadpool(story.make_episode, body.theme, chosen, store.root / "episodes",
-                                       story_writer())
+        ep = await run_in_threadpool(story.make_episode, body.theme, chosen, store.root / "episodes",
+                                     story_writer())
     except ValueError as e:
         raise HTTPException(422, str(e))
+    if agent.available():  # Polly narration; without it the TV speaks with its own voice
+        ep = await run_in_threadpool(voice.narrate, ep, store.root / "media")
+        story.save_episode(ep, store.root / "episodes")
+    return ep
 
 
 @app.get("/api/story/{ep_id}")
@@ -173,7 +178,15 @@ def get_story(ep_id: str):
 
 def story_writer():
     """The AI story agent when AWS is configured, else None (templates)."""
-    return None
+    return agent.writer if agent.available() else None
+
+
+@app.get("/media/{ep_id}/{name}")
+def media(ep_id: str, name: str):
+    f = store.root / "media" / ep_id / name
+    if not ep_id.isalnum() or not name.endswith(".mp3") or "/" in name or "\\" in name or not f.exists():
+        raise HTTPException(404)
+    return FileResponse(f, media_type="audio/mpeg")
 
 
 @app.exception_handler(HTTPException)

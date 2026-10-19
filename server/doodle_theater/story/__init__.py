@@ -46,9 +46,13 @@ def make_episode(theme: str, cast: list[dict], episodes: Path, writer=None) -> d
     ep["source"] = source
     ep["cast"] = [{"id": c["id"], "name": c["name"], "pitch": TV_PITCHES[i % len(TV_PITCHES)]}
                   for i, c in enumerate(cast)]
+    save_episode(ep, episodes)
+    return ep
+
+
+def save_episode(ep: dict, episodes: Path) -> None:
     episodes.mkdir(parents=True, exist_ok=True)
     (episodes / f"{ep['id']}.json").write_text(json.dumps(ep, indent=1), encoding="utf-8")
-    return ep
 
 
 def load_episode(ep_id: str, episodes: Path) -> dict:
