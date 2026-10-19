@@ -1,0 +1,27 @@
+# Android
+tv/local.properties
+tv/.gradle/
+tv/.kotlin/
+tv/build/
+tv/app/build/
+tv/.idea/
+*.iml
+*.jks
+*.keystore
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Secrets: never commit
+.env
+*.env
+aws-credentials*
+
+# Runtime data written by the server (drawings, rigs, episodes, audio)
+server/data/
+
+# Raw screen captures; the final cut lives on YouTube
+demo/raw/

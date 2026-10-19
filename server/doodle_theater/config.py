@@ -1,0 +1,36 @@
+"""Settings, all overridable by environment variables (see server/.env.example)."""
+from __future__ import annotations
+
+import os
+import socket
+from pathlib import Path
+
+SERVER_DIR = Path(__file__).resolve().parent.parent
+DATA = Path(os.environ.get("DT_DATA", SERVER_DIR / "data"))
+STATIC = SERVER_DIR / "static"
+PORT = int(os.environ.get("DT_PORT", "8787"))
+
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+# Vision (joints + one-line description) and story writing. Any Bedrock Converse model id or
+# inference profile works; DT_*_MODEL=off disables that feature (offline fallbacks take over).
+VISION_MODEL = os.environ.get("DT_VISION_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+STORY_MODEL = os.environ.get("DT_STORY_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+GUARDRAIL_ID = os.environ.get("DT_GUARDRAIL_ID", "")
+GUARDRAIL_VERSION = os.environ.get("DT_GUARDRAIL_VERSION", "DRAFT")
+NARRATOR_VOICE = os.environ.get("DT_NARRATOR_VOICE", "Ruth")
+
+
+def lan_ip() -> str:
+    """The laptop's address on the Wi-Fi, which the parent's phone must reach. No packets are sent."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+def public_url() -> str:
+    return os.environ.get("DT_PUBLIC_URL") or f"http://{lan_ip()}:{PORT}"
