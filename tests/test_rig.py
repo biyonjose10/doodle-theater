@@ -152,6 +152,14 @@ def test_given_joints_are_snapped_inside(rig):
     assert mask[int(y), int(x)] > 0
 
 
+@pytest.mark.parametrize("name", HUMANOIDS)
+def test_tight_crops_survive_the_full_photo_path(name):
+    """A drawing that touches the image edge must not be reduced to its interior details."""
+    crop, mask = extract_character(FIX / f"{name}_texture.png")  # NOT told it is cropped
+    ref = cv2.imread(str(FIX / f"{name}_mask.png"), cv2.IMREAD_GRAYSCALE)
+    assert (mask > 0).sum() > 0.6 * (ref > 0).sum()
+
+
 @pytest.mark.parametrize("photo", ["garlic.png", "char6_image.png"])
 def test_full_phone_photos_find_one_character(photo):
     crop, mask = extract_character(FIX / photo)

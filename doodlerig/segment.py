@@ -80,14 +80,19 @@ def find_character_box(img: np.ndarray) -> tuple[int, int, int, int]:
     n, labels, stats, _ = cv2.connectedComponentsWithStats(ink, 8)
     keep = np.zeros_like(ink)
     min_area = 0.0005 * h * w
+    total = kept = 0
     for i in range(1, n):
         x, y, bw, bh, a = stats[i]
         if a < min_area:
             continue
+        total += a
         if x <= 1 or y <= 1 or x + bw >= w - 1 or y + bh >= h - 1:
             continue  # table edges, fingers, paper borders
         keep[labels == i] = 255
-    if not keep.any():
+        kept += a
+    # If most of the ink touches the frame, the drawing itself fills the photo (a tight scan or
+    # crop): dropping border strokes would leave only an eye or a button. Use the whole image.
+    if kept < 0.35 * total or not keep.any():
         return 0, 0, w, h
     # Merge nearby strokes (eyes, buttons, detached hands) into one cluster.
     k = max(5, int(0.04 * max(h, w)))
