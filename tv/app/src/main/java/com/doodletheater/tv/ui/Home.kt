@@ -80,7 +80,7 @@ fun Home(api: ServerApi, onAddStar: () -> Unit, onStory: (Theme) -> Unit, onDanc
         )
         Spacer(Modifier.height(12.dp))
         RowTitle("Your stars")
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
             item {
                 TvCard(onClick = onAddStar, modifier = Modifier.focusRequester(first), tint = Ink.accent) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -102,7 +102,7 @@ fun Home(api: ServerApi, onAddStar: () -> Unit, onStory: (Theme) -> Unit, onDanc
         }
         Spacer(Modifier.height(6.dp))
         RowTitle(if (cast.isEmpty()) "Stories (add a star first)" else "Start tonight's story")
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
             items(THEMES, key = { it.id }) { t ->
                 TvCard(onClick = { if (cast.isNotEmpty()) onStory(t) }, tint = t.tint, width = 150, height = 100) {
                     Column(Modifier.fillMaxSize().padding(9.dp), verticalArrangement = Arrangement.SpaceBetween) {
