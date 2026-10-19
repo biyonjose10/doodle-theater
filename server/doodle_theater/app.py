@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import pipeline
+from . import pipeline, story
 from .config import STATIC, public_url
 from .store import Store
 
@@ -141,6 +141,39 @@ def send(code: str, draft_id: str, body: Send):
     entry = store.add_to_cast(draft_id, body.name.strip(), desc)
     store.push(code.upper(), {"type": "character", **entry})
     return entry
+
+
+# Stories
+
+class StoryRequest(BaseModel):
+    theme: str
+    cast: list[str] = Field(default_factory=list, max_length=4)
+
+
+@app.post("/api/story")
+async def new_story(body: StoryRequest):
+    everyone = {c["id"]: c for c in store.cast()}
+    chosen = [everyone[i] for i in body.cast if i in everyone] or list(everyone.values())[-3:]
+    try:
+        return await run_in_threadpool(story.make_episode, body.theme, chosen, store.root / "episodes",
+                                       story_writer())
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/story/{ep_id}")
+def get_story(ep_id: str):
+    if not ep_id.isalnum():
+        raise HTTPException(404)
+    try:
+        return story.load_episode(ep_id, store.root / "episodes")
+    except FileNotFoundError:
+        raise HTTPException(404)
+
+
+def story_writer():
+    """The AI story agent when AWS is configured, else None (templates)."""
+    return None
 
 
 @app.exception_handler(HTTPException)

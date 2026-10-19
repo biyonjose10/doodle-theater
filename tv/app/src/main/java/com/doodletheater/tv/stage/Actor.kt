@@ -22,6 +22,8 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
         rig.texture?.let { shader = BitmapShader(it, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP) }
     }
 
+    private val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(225, 255, 251, 240) }
+
     var x = 0.5f
     var feetY = 0.9f
     var heightFraction = 0.42f        // how tall the puppet is, as a fraction of stage height
@@ -39,7 +41,18 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
         motionName = name
         started = now
         this.then = then
+        stopAt = Double.MAX_VALUE
     }
+
+    /** Play a looping motion for a while (a story beat), then settle back to idle. */
+    fun playFor(name: String, now: Double, seconds: Double) {
+        play(name, now)
+        if (motion.loop) stopAt = now + seconds
+    }
+
+    private var stopAt = Double.MAX_VALUE
+    val offstage get() = x < -0.05f || x > 1.05f
+    val walking get() = targetX != null
 
     /** Walk (or run) to [x], then play [arrive], e.g. a wave on entrance. */
     fun walkTo(x: Float, now: Double, run: Boolean = false, arrive: String = "idle") {
@@ -69,6 +82,7 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
             }
         }
         if (!motion.loop && now - started >= motion.duration) play(then, now)
+        if (targetX == null && now >= stopAt) play("idle", now)
     }
 
     fun draw(canvas: Canvas, stageW: Float, stageH: Float, now: Double, labelPaint: Paint? = null) {
@@ -76,8 +90,12 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
         val s = heightFraction * stageH / rig.meshHeight
         label?.let { text ->
             if (labelPaint != null) {
-                val top = feetY * stageH - heightFraction * stageH - labelPaint.textSize * 0.6f
-                canvas.drawText(text, x * stageW, top, labelPaint)
+                // A paper name tag above the head, readable on any backdrop.
+                val base = feetY * stageH - heightFraction * stageH - labelPaint.textSize * 0.5f
+                val w = labelPaint.measureText(text) / 2 + labelPaint.textSize * 0.5f
+                val h = labelPaint.textSize
+                canvas.drawRoundRect(x * stageW - w, base - h, x * stageW + w, base + h * 0.35f, h * 0.6f, h * 0.6f, tagPaint)
+                canvas.drawText(text, x * stageW, base, labelPaint)
             }
         }
         canvas.save()

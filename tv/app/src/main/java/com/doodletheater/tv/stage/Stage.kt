@@ -45,6 +45,7 @@ fun Stage(
     actors: List<Actor>,
     modifier: Modifier = Modifier,
     backdrop: ImageBitmap? = null,
+    transparent: Boolean = false,     // the caller draws the scenery underneath
     showFps: Boolean = false,
     spotlight: Actor? = null,
     labelPaint: Paint? = null,
@@ -65,7 +66,9 @@ fun Stage(
         if (f == 0L) return@Canvas
         val now = nowSeconds(f)
         onFrame(now)
-        if (backdrop != null) {
+        if (transparent) {
+            // nothing: scenery is composed underneath
+        } else if (backdrop != null) {
             drawImage(backdrop, dstOffset = IntOffset.Zero, dstSize = IntSize(size.width.toInt(), size.height.toInt()))
         } else {
             paperBackdrop()

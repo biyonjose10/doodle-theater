@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.doodletheater.tv.net.ServerApi
+import com.doodletheater.tv.story.StoryPlayer
 
 sealed interface Screen {
     data object Home : Screen
@@ -35,6 +36,6 @@ fun App(start: Screen = Screen.Home) {
         Screen.AddStar -> AddStar(api)
         Screen.DanceParty -> DanceParty(api)
         Screen.Lab -> PuppetLab()
-        is Screen.Story -> DanceParty(api)   // replaced by the story player once stories exist
+        is Screen.Story -> StoryPlayer(api, s.theme, onHome = { screen = Screen.Home })
     }
 }

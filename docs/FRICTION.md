@@ -43,7 +43,13 @@ Logged while we built it, not reconstructed afterwards. Severity: **Blocker** (n
   voice commands reaching the app's media session, or Appstore In-App Purchasing through App
   Tester.
 - **Severity:** Medium.
-- **Workaround:** We simulate "Alexa, pause" with `adb shell media dispatch pause` against our
-  MediaSession, and keep Fire-specific features behind interfaces.
+- **Workaround:** We simulate "Alexa, pause" with `adb shell cmd media_session dispatch pause`
+  against our MediaSession. (The older `media dispatch` shell command does not exist on the API 30
+  TV image.) A second trap: a session only receives media buttons if the app itself plays audio.
+  Narration through the system TextToSpeech plays in the engine's process, so "Media button
+  session is null" and Alexa transport commands went nowhere. We now render speech to a file and
+  play it with our own MediaPlayer.
+- **Suggestion:** Document in the Fire TV media-session guide which app Alexa transport commands
+  are routed to, and how to test it without a device.
 - **Suggestion:** Publish a Fire OS 8 emulator image for Android Studio's SDK Manager, even one
   without DRM video, so developers can test launcher and voice integration.
