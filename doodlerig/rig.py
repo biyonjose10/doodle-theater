@@ -126,7 +126,9 @@ def rig_from_mask(crop: np.ndarray, mask: np.ndarray, joints: Joints | None = No
     idx, w = compute_weights(verts, tris, joints)
     tris = _order_triangles(tris, idx, w)
     ground = float(max(joints["right_foot"][1], joints["left_foot"][1], np.percentile(verts[:, 1], 99)))
-    return Rig(texture, joints, verts, tris, idx, w, ground, description, meta or {})
+    # Where the texture sits inside the crop, so edited joints can be mapped back for a rebuild.
+    meta = {**(meta or {}), "crop_offset": [int(x0), int(y0)]}
+    return Rig(texture, joints, verts, tris, idx, w, ground, description, meta)
 
 
 def build_rig(src, joints: Joints | None = None, joint_provider: JointProvider | None = None,
