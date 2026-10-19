@@ -47,6 +47,7 @@ fun Stage(
     backdrop: ImageBitmap? = null,
     showFps: Boolean = false,
     spotlight: Actor? = null,
+    labelPaint: Paint? = null,
     onFrame: (Double) -> Unit = {},
 ) {
     var frame by remember { mutableLongStateOf(0L) }
@@ -80,7 +81,7 @@ fun Stage(
         drawIntoCanvas { c ->
             for (a in actors) {
                 a.update(now)
-                a.draw(c.nativeCanvas, size.width, size.height, now)
+                a.draw(c.nativeCanvas, size.width, size.height, now, labelPaint)
             }
             if (showFps) c.nativeCanvas.drawText("${fps.tick(f)} fps  ${actors.size} puppets", 24f, 44f, hud)
         }

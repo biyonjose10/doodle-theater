@@ -74,12 +74,12 @@ fun PuppetLab() {
         Stage(actors, showFps = true, spotlight = actors[selected], onFrame = { clock[0] = it })
         Text(
             "◀ ▶ puppet    ▲ ▼ move: ${names[move]}    OK play    ⏯ walk across",
-            color = Color.White, fontSize = 22.sp,
+            color = Color.White, fontSize = 11.sp,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 28.dp)
-                .background(Color(0x99000000), RoundedCornerShape(24.dp))
-                .padding(horizontal = 24.dp, vertical = 10.dp),
+                .padding(bottom = 14.dp)
+                .background(Color(0x99000000), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 5.dp),
         )
     }
 }

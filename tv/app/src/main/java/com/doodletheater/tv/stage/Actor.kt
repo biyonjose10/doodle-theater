@@ -41,11 +41,18 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
         this.then = then
     }
 
-    fun walkTo(x: Float, now: Double, run: Boolean = false) {
+    /** Walk (or run) to [x], then play [arrive], e.g. a wave on entrance. */
+    fun walkTo(x: Float, now: Double, run: Boolean = false, arrive: String = "idle") {
         targetX = x
         speed = if (run) 0.32f else 0.16f
+        arriveWith = arrive
         play(if (run) "run" else "walk", now)
     }
+
+    private var arriveWith = "idle"
+
+    /** Name shown above the puppet's head, or null. */
+    var label: String? = null
 
     val busy get() = targetX != null || (!motion.loop && motionName != "idle")
 
@@ -56,7 +63,7 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
             val step = (speed * dt).toFloat()
             val gap = tx - x
             if (abs(gap) <= step) {
-                x = tx; targetX = null; play("idle", now)
+                x = tx; targetX = null; play(arriveWith, now)
             } else {
                 x += step * sign(gap)
             }
@@ -64,9 +71,15 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
         if (!motion.loop && now - started >= motion.duration) play(then, now)
     }
 
-    fun draw(canvas: Canvas, stageW: Float, stageH: Float, now: Double) {
+    fun draw(canvas: Canvas, stageW: Float, stageH: Float, now: Double, labelPaint: Paint? = null) {
         val verts = skinner.pose(sample.sample(motion, now - started))
         val s = heightFraction * stageH / rig.meshHeight
+        label?.let { text ->
+            if (labelPaint != null) {
+                val top = feetY * stageH - heightFraction * stageH - labelPaint.textSize * 0.6f
+                canvas.drawText(text, x * stageW, top, labelPaint)
+            }
+        }
         canvas.save()
         canvas.translate(x * stageW - rig.rest[0].toFloat() * s, feetY * stageH - rig.groundY * s)
         canvas.scale(s, s)
