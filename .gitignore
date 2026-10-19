@@ -25,3 +25,8 @@ server/data/
 
 # Raw screen captures; the final cut lives on YouTube
 demo/raw/
+*.pem
+*.key
+.env.*
+!.env.example
+.claude/
