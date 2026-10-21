@@ -349,7 +349,8 @@ async function showDraft(d) {
   $("meta").textContent = `ready in ${draft.seconds}s · joints by ${draft.joints_from}`;
   $("repick").classList.toggle("hidden", !upload);
   show("s-check");
-  $("name").focus();
+  // On a phone, focusing would pop the keyboard over the puppet the parent should be looking at.
+  if (!matchMedia("(pointer: coarse)").matches) $("name").focus({ preventScroll: true });
 }
 
 function showPicker() {

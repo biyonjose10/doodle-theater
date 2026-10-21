@@ -33,6 +33,7 @@ Built with Kotlin, Jetpack Compose for TV, Python, FastAPI, Amazon Polly, Amazon
 Agents.
 
 Drawings by a neighbour's child (shared with permission), cleaned up with Gemini.
+The pig in the cut-out fix is a test drawing from Meta's AnimatedDrawings (MIT).
 Voice-over: Amazon Polly (neural voice Ruth). No music.
 
 ## Tags

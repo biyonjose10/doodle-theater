@@ -75,6 +75,10 @@ PHONE_MAX = 30.0            # with --phone-in/--phone-out: longer phone clips ar
 # "Queen Whiskers is on the TV now!" (all three steps ticked) 21.5, static to the end.
 PHONE_RANGES = [(4.3, 9.25, 1.0), (11.9, 17.5, 1.5), (17.5, 22.3, 1.0)]  # (in, out, speed)
 PHONE_CROP_TOP = 182        # status bar (notification icons) + Chrome URL bar
+# clips/phone_fix.mp4 (record_fix.py, 2026-10-22): the picker grid 2.5, Queen Whiskers picked 4.5;
+# the pig with only its outline 15.2; brush opened 20, body painted back 22-28, Done 29, rebuilt 30.
+PHONE_FIX = CLIPS / "phone_fix.mp4"
+FIX_RANGES = [(2.3, 6.6, 1.0), (15.0, 17.2, 1.0), (19.8, 28.4, 1.6), (29.6, 33.4, 1.0)]
 CHIPS_CROP = "1280:720:640:0"  # Home's top-right: the Bedtime and Stories-tonight chips
 
 
@@ -191,9 +195,10 @@ def make_phone_masks(tmp: Path, L: PhoneLayout) -> tuple[Path, Path]:
     return mask, shadow
 
 
-def phone_piece(tmp: Path, a: float | None, b: float | None, max_len: float) -> tuple[Piece, PhoneLayout, str]:
-    """Clip C on a cream frame. Uses PHONE_RANGES unless --phone-in/--phone-out are given."""
-    info = probe(PHONE) if PHONE.exists() else None
+def phone_piece(tmp: Path, a: float | None, b: float | None, max_len: float,
+                path: Path = PHONE, use: list | None = None) -> tuple[Piece, PhoneLayout, str]:
+    """A phone clip on a cream frame. Uses `use` (default PHONE_RANGES) unless --phone-in/--phone-out are given."""
+    info = probe(path) if path.exists() else None
     vs = [s for s in (info or {}).get("streams", []) if s.get("codec_type") == "video"]
     if vs and float(info["format"].get("duration", 0) or 0) > 1:
         sw, sh = int(vs[0]["width"]), int(vs[0]["height"])
@@ -202,19 +207,19 @@ def phone_piece(tmp: Path, a: float | None, b: float | None, max_len: float) -> 
             a, b = max(0.0, a or 0.0), min(total, b if b is not None else total)
             ranges = [(a, b, max(1.0, (b - a) / max_len))]
         else:
-            ranges = [(ra, min(total, rb if rb is not None else total), sp) for ra, rb, sp in PHONE_RANGES]
+            ranges = [(ra, min(total, rb if rb is not None else total), sp) for ra, rb, sp in (use or PHONE_RANGES)]
         crop = f"crop={sw}:{sh - PHONE_CROP_TOP}:0:{PHONE_CROP_TOP}," if PHONE_CROP_TOP else ""
         sh -= PHONE_CROP_TOP
         src, parts, dur = [], [], 0.0
         for n, (ra, rb, sp) in enumerate(ranges):
             d = fr((rb - ra) / sp)
-            src.append(["-ss", f"{ra:.3f}", "-t", f"{rb - ra + 0.5:.3f}", "-i", str(PHONE)])
+            src.append(["-ss", f"{ra:.3f}", "-t", f"{rb - ra + 0.5:.3f}", "-i", str(path)])
             parts.append(f"[{{i{4 + n}}}:v:0]setpts=(PTS-STARTPTS)/{sp},fps={FPS},{crop}setsar=1,"
                          f"tpad=stop_mode=clone:stop_duration=2,trim=duration={d:.4f},setpts=PTS-STARTPTS[r{n}{{out}}]")
             dur += d
         dur = fr(dur)
         head = ";".join(parts) + ";" + "".join(f"[r{n}{{out}}]" for n in range(len(ranges))) +             f"concat=n={len(ranges)}:v=1:a=0"
-        note = "phone.mp4 {}x{} (top {} px cropped), ".format(sw, sh + PHONE_CROP_TOP, PHONE_CROP_TOP) +             ", ".join(f"src {ra:.1f}-{rb:.1f} at {sp:g}x" for ra, rb, sp in ranges) + f" -> {dur:.2f} s"
+        note = path.name + " {}x{} (top {} px cropped), ".format(sw, sh + PHONE_CROP_TOP, PHONE_CROP_TOP) +             ", ".join(f"src {ra:.1f}-{rb:.1f} at {sp:g}x" for ra, rb, sp in ranges) + f" -> {dur:.2f} s"
     else:
         sw, sh, dur = 720, 1412, fr(PHONE_PLANNED)
         (tmp / "ph1.txt").write_text("Clip C: phone", encoding="utf-8", newline="\n")
@@ -350,6 +355,7 @@ def build_scenes(tmp: Path, phone_in, phone_out, phone_max) -> tuple[list[Scene]
     story, pause = CLIPS / "story_sound.mp4", CLIPS / "pause_sound.mp4"
     bed = CLIPS / "bedtime.mp4"
     ph, L, note = phone_piece(tmp, phone_in, phone_out, phone_max)
+    fx, LF, _ = phone_piece(tmp, None, None, PHONE_MAX, path=PHONE_FIX, use=FIX_RANGES)
     scenes = [
         Scene("1 hook: the drawings", [still(IMAGES / "drawings_photo.webp", 7.5, zoom=(1.0, 1.12))],
               vo=[("1_hook", 0.5)], caps=[Cap("Doodle Theater", 0.5, 6.2, "title")]),
@@ -371,6 +377,11 @@ def build_scenes(tmp: Path, phone_in, phone_out, phone_max) -> tuple[list[Scene]
         # arrived!" pops up (home_add src 30.4) and she walks in (to ~34), then waves.
         Scene("3b Queen Whiskers arrives", [clip(home, 28.7, 38.2)], vo=[("3b_send", -0.3)],
               caps=[Cap("Photo to puppet in seconds, animated live on the TV", 2.0, 9.2)], xfade=0.3),
+        # A page of drawings -> tap one; then a drawing whose cut-out lost its body, painted back.
+        Scene("3c pick a drawing, fix the cut-out", [fx], vo=[("3c_fix", 0.3)], xfade=0.3,
+              side_x=LF.text_x, side_y="200",
+              caps=[Cap("Lots of drawings?\nTap your star.", 0.3, 4.4, "side"),
+                    Cap("Cut-out missed\na bit? Paint it\nback with Add.", 4.6, fx.dur - 0.3, "side")]),
         # story_sound: title 12.3, narration from 13.0, "What should they do?" with the picture
         # cards 32.3, focus moves to "Swim through the kelp" 36.0, kelp scene 38.0.
         Scene("4 tonight's story", [clip(story, 12.1, 42.5)], audio=[(story, 12.1, 42.5)],

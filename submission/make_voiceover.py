@@ -20,6 +20,8 @@ LINES = {
     "3a_add": "A parent scans the code on the TV and snaps the drawing. Our open-source rigger, doodle-rig, "
               "cuts the character out, finds the joints, and builds a mesh. If a dot is off, you drag it.",
     "3b_send": "Press send, and... Queen Whiskers walks on stage.",
+    "3c_fix": "A whole page of drawings? Tap the one you want. And if the cut-out misses a bit, "
+              "paint it back, and the puppet is rebuilt.",
     "4_story": "Every line is narrated by Amazon Polly, with word timings driving the read-along highlight "
                "and the puppets' moves. Halfway through, the child decides what happens next.",
     "5_pause": "It behaves like real TV. Alexa, pause, stops the story mid-word, and it picks up right where it left off.",
