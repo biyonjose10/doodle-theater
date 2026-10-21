@@ -12,7 +12,7 @@ from PIL import Image
 
 from .joints import NAMES, PARENT, SKELETON, Joints, heuristic_joints, snap_inside, validate
 from .mesh import build_mesh
-from .segment import extract_character, whiten
+from .segment import extract_character, soft_alpha, whiten
 from .weights import compute_weights
 
 FORMAT_VERSION = 1
@@ -119,7 +119,7 @@ def rig_from_mask(crop: np.ndarray, mask: np.ndarray, joints: Joints | None = No
         raise ValueError("; ".join(problems))
 
     rgb = whiten(crop, mask)
-    alpha = cv2.GaussianBlur(mask, (3, 3), 0)
+    alpha = soft_alpha(mask)                 # anti-aliased edge; the mesh still uses the binary mask
     texture = np.dstack([rgb, alpha]).astype(np.uint8)
 
     verts, tris = build_mesh(mask)
@@ -132,12 +132,13 @@ def rig_from_mask(crop: np.ndarray, mask: np.ndarray, joints: Joints | None = No
 
 
 def build_rig(src, joints: Joints | None = None, joint_provider: JointProvider | None = None,
-              already_cropped: bool = False, description: str = "") -> Rig:
+              already_cropped: bool = False, description: str = "", box=None) -> Rig:
     """Photo of a drawing -> Rig.
 
     `joints` (in crop coordinates) wins over `joint_provider`, which wins over the heuristic.
+    `box` (from `segment.find_characters`) picks one drawing on a sheet with several.
     """
-    crop, mask = extract_character(src, already_cropped=already_cropped)
+    crop, mask = extract_character(src, already_cropped=already_cropped, box=box)
     if not mask.any():
         raise ValueError("no character found: is the drawing outlined in dark marker on plain paper?")
     source = "given"

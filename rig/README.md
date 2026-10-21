@@ -71,11 +71,19 @@ out and legs apart**, not touching the body. Photograph from straight above in d
 
 ## How it works
 
-1. **Find the paper, then the ink.** Otsu thresholding finds the sheet. Adaptive thresholding
-   finds the strokes; anything touching the photo's edge (table, fingers) is ignored, and nearby
-   strokes are grouped into one character.
+1. **Find the paper, then the ink.** A sheet shot at an angle is first warped flat when it is
+   clearly a skewed quadrilateral (its true shape comes from a pinhole-camera estimate). Otsu
+   thresholding finds the sheet; when a shadow makes part of it darker than the table, a
+   lighting-flattened view (the photo divided by an inpainted estimate of the bare paper) finds
+   the whole sheet instead. Ink is anything far from the paper colour, in darkness or in chroma,
+   so pale crayon with no dark outline still counts. Anything touching the photo's edge (table,
+   fingers) is ignored, and nearby strokes are grouped into characters. `find_characters` lists
+   every drawing on the sheet, biggest first, and `box=` picks one.
 2. **Cut out.** Close the strokes, flood the background in from the border, and keep the largest
-   enclosed region (after AnimatedDrawings).
+   enclosed region (after AnimatedDrawings). If the flood leaked in through a gap in the outline
+   (leaving only the ring of strokes), stronger closings are tried and only the plug in the gap is
+   kept, so armpits stay open. The texture gets an anti-aliased, ~1 px feathered alpha edge; the
+   mesh is still built from the binary mask.
 3. **Joints.** Feet from the two lowest-reaching pieces of the silhouette, followed up to where the
    legs join (the crotch), hands from the farthest sideways reach above it, then everything
    snapped inside the drawing.
