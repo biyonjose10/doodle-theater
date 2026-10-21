@@ -182,7 +182,7 @@ Windows. See [docs/FRICTION.md](docs/FRICTION.md).
 - **Amazon Bedrock (Converse API, Amazon Nova 2 Lite).** Reads the cut-out drawing and proposes
   joint positions and a warm one-line description, which the story then uses so the child
   recognises their character. Also powers the story agent. Nova is the default because it is
-  first-party and available on AWS Free plan accounts.
+  first-party, so it needs no Marketplace subscription (Anthropic models do).
 - **Strands Agents.** The story writer is an agent with three tools (`list_backdrops`,
   `list_moves`, `submit_episode`). The submit tool runs the TV's own validator and returns the
   problems, so the model repairs moves that don't exist or cue words missing from a line before
