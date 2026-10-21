@@ -53,3 +53,86 @@ Logged while we built it, not reconstructed afterwards. Severity: **Blocker** (n
   are routed to, and how to test it without a device.
 - **Suggestion:** Publish a Fire OS 8 emulator image for Android Studio's SDK Manager, even one
   without DRM video, so developers can test launcher and voice integration.
+
+---
+
+## 2026-10-21: AWS account onboarding
+
+### 4. An unfinished signup sends every service to one ambiguous page
+- **Task:** Open Amazon Bedrock, IAM and Billing on an older AWS account to enable models and
+  create an access key.
+- **Steps:** Signed in to the console and opened each service.
+- **Expected:** The service console, or a message naming the exact signup step still missing.
+- **Actual:** Bedrock, IAM and Billing all redirected to the same generic *Complete your account
+  setup* page. It says the account has "either not finished registering, or your account is
+  currently on free plan", so it does not say which of the two applies or which step is missing.
+- **Severity:** High. No service was usable until signup was finished, and the page gave no way to
+  tell what was left.
+- **Workaround:** Finished the remaining signup steps (see entry 6), after which the services opened.
+- **Suggestion:** Name the missing step (payment method, identity verification, phone check,
+  support plan) and link straight to it. Keep "unfinished signup" and "Free plan limit" as two
+  separate messages.
+
+### 5. The credits page shows $0 until signup is finished
+- **Task:** Check the account's credits before using paid services.
+- **Expected:** The credit balance, or a note that credits appear after signup.
+- **Actual:** The credits page showed $0 while signup was unfinished, which reads as "no credits".
+- **Severity:** Low.
+- **Workaround:** Finished signup first.
+- **Suggestion:** Show "Credits become available when you finish account setup" instead of $0.
+
+### 6. Indian signup: UPI AutoPay mandate and DigiLocker KYC to the Aadhaar-linked number
+- **Task:** Complete AWS signup from India.
+- **Steps:** Payment step, then identity verification.
+- **Expected:** A card check and an OTP to the phone number given to AWS.
+- **Actual:** Payment needed a UPI AutoPay mandate, with a ₹15,000 limit shown on the mandate.
+  Identity verification went through DigiLocker KYC, whose OTP is sent to the mobile number
+  linked to the Aadhaar, not the phone number entered on the AWS form.
+- **Severity:** High for anyone whose Aadhaar-linked number is old or held by a parent, as is
+  common for students.
+- **Workaround:** None inside the flow; the OTP has to be received on the Aadhaar-linked number.
+- **Suggestion:** Say before the KYC step that the OTP goes to the Aadhaar-linked number, and
+  explain on the mandate screen that ₹15,000 is a ceiling, not a charge.
+
+### 7. Free plan appears to block Anthropic models on Bedrock; defaults switched to Nova
+- **Task:** Run the vision and story steps on the code's default model,
+  `us.anthropic.claude-haiku-4-5-20251001-v1:0`.
+- **Expected:** Model access granted from the Bedrock console like other models.
+- **Actual:** Anthropic models need a use-case form, and the account is on the AWS Free plan,
+  which appears to block AWS Marketplace models, Anthropic's included.
+- **Severity:** Medium.
+- **Workaround:** Changed both defaults in `server/doodle_theater/config.py` to Amazon Nova 2 Lite
+  (`us.amazon.nova-2-lite-v1:0`). The Converse API made this a model-id change only.
+- **Suggestion:** In the Bedrock model catalog, mark which models a Free plan account can call and
+  why a model is unavailable (plan, form pending, region).
+
+### 8. Nova Canvas not listed in us-east-1 for this account
+- **Task:** Optionally replace the code-drawn crayon backdrops with Nova Canvas art.
+- **Expected:** Nova Canvas in the us-east-1 foundation model list.
+- **Actual:** It was not listed for this account in us-east-1.
+- **Severity:** Low. Backdrops are drawn in code (`backdrops.py`) and need no model.
+- **Workaround:** Kept the 18 code-drawn backdrops.
+- **Suggestion:** When a model is missing from a region's list for an account, say whether it is
+  the region, the plan or access that hides it.
+
+### 9. No AWS CLI on Windows by default
+- **Task:** Give boto3 credentials on the Windows dev laptop.
+- **Expected:** `aws configure`.
+- **Actual:** The AWS CLI is not installed on Windows by default, so `aws configure` is not
+  available without a separate install.
+- **Severity:** Low.
+- **Workaround:** Entered the credentials through a small local pop-up instead of the CLI.
+- **Suggestion:** Next to the new access key, show the plain `~/.aws/credentials` file format as
+  an alternative to `aws configure`.
+
+### 10. Bedrock calls denied for hours after signup was finished
+- **Task:** First live Nova call right after completing the account signup.
+- **Expected:** The call works once the console and IAM work.
+- **Actual:** `Converse` returned `AccessDeniedException: Your account is currently being verified.
+  Verification normally takes less than 2 hours.` The console, IAM, STS and Bedrock list calls all
+  worked, so nothing hinted that invoking would be blocked.
+- **Severity:** Medium on a deadline: the AI path could not be tested the same afternoon.
+- **Workaround:** The server falls back to the offline templates on any Bedrock error, so the app
+  kept working; the live test waited for verification.
+- **Suggestion:** Show "account verification in progress" with an estimate on the console home and
+  Bedrock pages, not only in the error from the first invoke.
