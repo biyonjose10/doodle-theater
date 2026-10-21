@@ -63,8 +63,8 @@ PHONE = CLIPS / "phone.mp4"
 W, H, FPS = 1920, 1080, 30
 CREAM = "0xfbf3e2"          # the app's background
 INK = "0x3a2a22"            # dark brown text on cream
-DUCK = 0.2                  # app narration under voice-over: 0.2 = -14 dB
-DUCK_PAUSE = 0.35           # scene 5: keep the pause audible (cut list says 35%)
+DUCK = 0.0                  # app narration is muted under voice-over: never two voices at once
+DUCK_PAUSE = 0.0           # scene 5: the voice-over comes first, then the pause is heard alone
 MASTER_DB = 6.0             # Polly MP3s sit around -25 dB mean; lift the whole mix a little
 PHONE_PLANNED = 12.0        # placeholder length when clip C is missing
 PHONE_MAX = 30.0            # with --phone-in/--phone-out: longer phone clips are sped up to fit this
@@ -377,9 +377,11 @@ def build_scenes(tmp: Path, phone_in, phone_out, phone_max) -> tuple[list[Scene]
               vo=[("4_story", 10.1)],
               caps=[Cap("Polly neural voices · word speech marks · picture choices on the D-pad", 10.5, 19.8)]),
         # pause_sound: "Look! A little star..." from 23.0, Paused 23.33, resumed 26.42.
-        Scene("5 pause / resume", [clip(pause, 19.3, 28.0)], audio=[(pause, 19.3, 28.0)],
-              vo=[("5_pause", 1.7)], duck=DUCK_PAUSE,
-              caps=[Cap('Emulator: "Alexa, pause" sent as a media-session pause command', 1.7, 8.4)]),
+        # Voice-over first (over the opening line), then the narration alone: "Look!" stops at the
+        # pause and picks up again, so the viewer hears the pause rather than two voices at once.
+        Scene("5 pause / resume", [clip(pause, 15.8, 29.5)], audio=[(pause, 15.8, 29.5)],
+              vo=[("5_pause", 0.1)], duck=DUCK_PAUSE,
+              caps=[Cap('Emulator: "Alexa, pause" sent as a media-session pause command', 7.2, 13.5)]),
         # party: tricks with the spotlight + "Now dancing" tag, everybody dances from ~23.
         Scene("6 dance party", [clip(party, 18.5, 29.95)], vo=[("6_dance", 2.2)]),
         # bedtime: Home with Bedtime ON, focus on Bolt (3-5), then a punch-in on the chips while
