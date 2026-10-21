@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -250,8 +251,9 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
 
         caption?.let { b ->
             Column(
-                Modifier.align(Alignment.TopCenter).padding(top = 16.dp).widthIn(max = 780.dp)
-                    .background(Color(0xEEFFFBF0), RoundedCornerShape(18.dp)).padding(horizontal = 22.dp, vertical = 10.dp),
+                Modifier.align(Alignment.TopCenter).padding(top = 20.dp).widthIn(min = 420.dp, max = 760.dp)
+                    .border(2.dp, Ink.line, RoundedCornerShape(24.dp))
+                    .background(Color(0xF2FFF8E7), RoundedCornerShape(24.dp)).padding(horizontal = 24.dp, vertical = 14.dp),
             ) {
                 speaker?.let {
                     Text(it, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = Ink.accent)
@@ -261,7 +263,7 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
                     buildAnnotatedString {
                         if (s in 0 until e && e <= b.text.length) {
                             append(b.text.substring(0, s))
-                            withStyle(SpanStyle(background = Color(0xFFFFD84D), color = Ink.ink)) { append(b.text.substring(s, e)) }
+                            withStyle(SpanStyle(background = Color(0xFFFFB800), color = Ink.night, fontWeight = FontWeight.ExtraBold)) { append(b.text.substring(s, e)) }
                             append(b.text.substring(e))
                         } else append(b.text)
                     },
@@ -302,16 +304,23 @@ private fun Banner(title: String, subtitle: String) {
 private fun ChoiceCards(choice: Choice, first: FocusRequester, onPick: (String) -> Unit) {
     Column(Modifier.fillMaxSize().padding(bottom = 36.dp), verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(choice.prompt, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color.White,
-            modifier = Modifier.background(Color(0xAA2B2B3A), RoundedCornerShape(16.dp)).padding(horizontal = 20.dp, vertical = 4.dp))
+        // Paper card rather than a dark strip: readable on every crayon backdrop.
+        Text(choice.prompt, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Ink.ink,
+            modifier = Modifier.background(Ink.paper, RoundedCornerShape(18.dp)).padding(horizontal = 24.dp, vertical = 4.dp))
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
             choice.options.forEachIndexed { i, o ->
-                TvCard(onClick = { onPick(o.next) }, tint = if (i == 0) Ink.accent else Ink.blue, width = 230, height = 90,
+                TvCard(onClick = { onPick(o.next) }, tint = if (i == 0) Ink.accent else Ink.blue, width = 300, height = 100,
                     modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text((if (i == 0) "◀  " else "") + o.label + (if (i == 1) "  ▶" else ""), fontFamily = Baloo,
-                            fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.White, textAlign = TextAlign.Center)
+                    Column(Modifier.fillMaxSize().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center) {
+                        // Which way to press, for children who can't read the option yet.
+                        Text(if (i == 0) "◀  LEFT" else "RIGHT  ▶", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold,
+                            fontSize = 12.sp, color = Ink.ink,
+                            modifier = Modifier.background(Ink.paper, RoundedCornerShape(50)).padding(horizontal = 10.dp))
+                        Spacer(Modifier.height(6.dp))
+                        Text(o.label, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.White,
+                            textAlign = TextAlign.Center, lineHeight = 22.sp)
                     }
                 }
             }
@@ -328,12 +337,12 @@ private fun EndCards(first: FocusRequester, onAgain: () -> Unit, onHome: () -> U
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             TvCard(onClick = onAgain, tint = Ink.accent, width = 170, height = 64, modifier = Modifier.focusRequester(first)) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Watch again", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
+                    Text("🔁  Watch again", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
                 }
             }
             TvCard(onClick = onHome, tint = Ink.blue, width = 170, height = 64) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Home", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
+                    Text("🏠  Home", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
                 }
             }
         }
