@@ -70,8 +70,9 @@ out and legs apart**, not touching the body. Photograph from straight above in d
    strokes are grouped into one character.
 2. **Cut out.** Close the strokes, flood the background in from the border, and keep the largest
    enclosed region (after AnimatedDrawings).
-3. **Joints.** Crotch from where the silhouette splits, hands from the farthest sideways reach
-   above it, feet from the lowest points on each side, then everything snapped inside the drawing.
+3. **Joints.** Feet from the two lowest-reaching pieces of the silhouette, followed up to where the
+   legs join (the crotch), hands from the farthest sideways reach above it, then everything
+   snapped inside the drawing.
 4. **Mesh.** The outline is resampled with an interior grid and Delaunay-triangulated. Triangles
    that bridge a gap (between an arm and the body) are rejected by sampling along every edge.
 5. **Weights.** Multi-source Dijkstra over the mesh gives each vertex its geodesic distance to

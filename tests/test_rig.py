@@ -67,6 +67,23 @@ def test_heuristic_joints_land_near_hand_annotations(humanoid):
     assert np.mean(err) < 0.12, dict(zip(ends, np.round(err, 3)))
 
 
+def test_feet_land_on_different_legs_when_one_reaches_lower():
+    """A cat with a tail whose right leg kicks down and across the body's centre line."""
+    mask = np.zeros((400, 320), np.uint8)
+    cv2.ellipse(mask, (160, 90), (60, 55), 0, 0, 360, 255, -1)              # head
+    cv2.rectangle(mask, (110, 140), (230, 260), 255, -1)                     # body, right of the head
+    cv2.line(mask, (115, 160), (20, 120), 255, 18)                          # arms
+    cv2.line(mask, (225, 160), (300, 110), 255, 18)
+    cv2.line(mask, (120, 220), (40, 250), 255, 14)                          # tail
+    cv2.line(mask, (150, 255), (175, 380), 255, 26)                          # right leg: lower, crosses the centre
+    cv2.line(mask, (210, 255), (280, 330), 255, 26)                          # left leg
+    j = heuristic_joints(mask)
+    assert j["right_foot"][0] < j["left_foot"][0]
+    assert abs(j["right_foot"][0] - 175) < 20 and j["right_foot"][1] > 370
+    assert abs(j["left_foot"][0] - 280) < 25 and j["left_foot"][1] > 320
+    assert 150 < j["root"][0] < 215
+
+
 def test_mesh_stays_inside_the_drawing(humanoid):
     _, _, mask = humanoid
     v, t = build_mesh(mask)

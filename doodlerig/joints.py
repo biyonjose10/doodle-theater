@@ -61,6 +61,55 @@ def snap_inside(mask: np.ndarray, joints: Joints) -> Joints:
     return out
 
 
+def _legs(inside: np.ndarray, y0: int, y1: int, H: int):
+    """Follow the two legs up from the feet to where they join: (crotch_y, crotch_x, foot, foot).
+
+    The feet are the two lowest-reaching pieces of the silhouette once the bottom is cut off;
+    the crotch is the highest cut that still keeps them apart. Unlike splitting at a centre
+    line, this survives one foot reaching lower and across the middle, a tail, or a centre
+    line that runs down one leg. None when the legs never separate (a dress, a blob).
+    """
+    min_area = 0.002 * inside.sum()
+    stop = int(y0 + 0.35 * H)
+
+    def pieces(y):
+        _, lab, stats, _ = cv2.connectedComponentsWithStats(inside[y:].astype(np.uint8), connectivity=8)
+        big = [i for i in range(1, len(stats)) if stats[i, cv2.CC_STAT_AREA] >= min_area]
+        return lab, stats, big
+
+    feet = anchors = None
+    for y in range(int(y1 - 0.08 * H), stop, -2):
+        lab, stats, big = pieces(y)
+        if len(big) >= 2:
+            low = sorted(big, key=lambda i: stats[i, cv2.CC_STAT_TOP] + stats[i, cv2.CC_STAT_HEIGHT])[-2:]
+            feet, anchors = [], []
+            for i in low:
+                py, px = np.nonzero(lab == i)
+                bottom = py.max()
+                feet.append((float(np.median(px[py >= bottom - 2])), float(bottom + y)))
+                k = int(np.argmin(py))  # a pixel of this leg that every higher cut still contains
+                anchors.append((int(py[k]) + y, int(px[k])))
+            break
+    if feet is None:
+        return None
+
+    crotch = None
+    for y in range(max(a[0] for a in anchors), stop, -2):
+        lab, stats, _ = pieces(y)
+        a, b = (lab[ay - y, ax] for ay, ax in anchors)
+        if a == 0 or b == 0 or a == b:
+            break
+        # The gap between the legs on the top row of this cut.
+        xa, xb = np.nonzero(lab[0] == a)[0], np.nonzero(lab[0] == b)[0]
+        if len(xa) and len(xb):
+            left, right = (xa, xb) if xa.mean() < xb.mean() else (xb, xa)
+            crotch = (y, (left.max() + right.min()) / 2)
+    if crotch is None:
+        return None
+    feet.sort()
+    return crotch[0], crotch[1], feet[0], feet[1]
+
+
 def heuristic_joints(mask: np.ndarray) -> Joints:
     """Guess the 16 joints from the silhouette alone.
 
@@ -90,6 +139,9 @@ def heuristic_joints(mask: np.ndarray) -> Joints:
     if root_y is None:
         root_y = int(y0 + 0.62 * H)
     root = (cx, float(root_y))
+    legs = _legs(inside, int(y0), int(y1), int(H))
+    if legs is not None:
+        root = (float(legs[1]), float(legs[0]))
 
     # Top of head: highest mask pixel near the centre line.
     near = np.abs(xs - cx) < 0.15 * (x1 - x0 + 1)
@@ -119,9 +171,12 @@ def heuristic_joints(mask: np.ndarray) -> Joints:
         xx = xs[sel][ys[sel] >= yy - 2]
         return float(np.median(xx)), float(yy)
 
-    lower = ys > root[1]
-    right_foot = lowest(lower & (xs < cx), (cx - 0.15 * H, float(y1)))
-    left_foot = lowest(lower & (xs > cx), (cx + 0.15 * H, float(y1)))
+    if legs is not None:
+        right_foot, left_foot = legs[2], legs[3]
+    else:
+        lower = ys > root[1]
+        right_foot = lowest(lower & (xs < cx), (cx - 0.15 * H, float(y1)))
+        left_foot = lowest(lower & (xs > cx), (cx + 0.15 * H, float(y1)))
 
     # Shoulders: where the arm leaves the body, on the torso row.
     row = inside[int(round(ty))]
@@ -134,8 +189,8 @@ def heuristic_joints(mask: np.ndarray) -> Joints:
     def mid(a, b, t=0.5):
         return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
 
-    right_hip = (cx + 0.35 * (right_foot[0] - cx), root[1] + 0.03 * H)
-    left_hip = (cx + 0.35 * (left_foot[0] - cx), root[1] + 0.03 * H)
+    right_hip = (root[0] + 0.35 * (right_foot[0] - root[0]), root[1] + 0.03 * H)
+    left_hip = (root[0] + 0.35 * (left_foot[0] - root[0]), root[1] + 0.03 * H)
 
     joints: Joints = {
         "root": root,
