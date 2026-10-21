@@ -34,20 +34,24 @@
   /* current step */
   main:has(#s-start:not(.hidden)) .steps li:nth-child(1),
   main:has(#s-work:not(.hidden)) .steps li:nth-child(2),
+  main:has(#s-pick:not(.hidden)) .steps li:nth-child(2),
   main:has(#s-check:not(.hidden) #name:placeholder-shown) .steps li:nth-child(2),
   main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(3) {
     border-color: var(--accent); color: var(--ink); }
   main:has(#s-start:not(.hidden)) .steps li:nth-child(1) .n,
   main:has(#s-work:not(.hidden)) .steps li:nth-child(2) .n,
+  main:has(#s-pick:not(.hidden)) .steps li:nth-child(2) .n,
   main:has(#s-check:not(.hidden) #name:placeholder-shown) .steps li:nth-child(2) .n,
   main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(3) .n {
     background: var(--accent); color: #fff; }
   /* finished steps get a green tick */
   main:has(#s-work:not(.hidden)) .steps li:nth-child(1) .n,
+  main:has(#s-pick:not(.hidden)) .steps li:nth-child(1) .n,
   main:has(#s-check:not(.hidden)) .steps li:nth-child(1) .n,
   main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(2) .n,
   main:has(#s-done:not(.hidden)) .steps li .n { background: var(--ok); color: #fff; font-size: 0; }
   main:has(#s-work:not(.hidden)) .steps li:nth-child(1) .n::after,
+  main:has(#s-pick:not(.hidden)) .steps li:nth-child(1) .n::after,
   main:has(#s-check:not(.hidden)) .steps li:nth-child(1) .n::after,
   main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(2) .n::after,
   main:has(#s-done:not(.hidden)) .steps li .n::after { content: "✓"; font-size: 14px; }
@@ -114,6 +118,40 @@
     .steps li { font-size: 14px; gap: 5px; }
   }
   .meta { font-size: 13px; color: var(--soft); text-align: right; }
+
+  /* Pick your character: a grid of big tappable thumbnails */
+  .pick-title { margin: 0 0 2px; font-size: 24px; line-height: 1.2; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0 16px; }
+  .cand { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 8px; border-radius: 18px;
+    border: 3px solid var(--line); background: #fff; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 3px 0 var(--line); transition: transform .12s ease, border-color .12s ease; }
+  .cand img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cand .n { position: absolute; top: 6px; left: 6px; width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 700; font-size: 15px; }
+  .cand:active { transform: scale(.96); border-color: var(--accent); }
+  .cand:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .link { display: block; margin: 10px auto 0; min-height: 48px; padding: 0 12px; border: 0; background: none;
+    color: var(--blue); font: 700 17px/1.2 "Baloo 2", system-ui, sans-serif; cursor: pointer; }
+
+  /* Fix the cut-out: paint on the mask */
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .seg { display: flex; flex: 1 1 auto; border-radius: 14px; overflow: hidden; border: 2px solid var(--line); }
+  .tool { flex: 1 1 0; min-width: 52px; min-height: 52px; border: 0; background: var(--paper); color: var(--ink);
+    font: 700 17px/1.1 "Baloo 2", system-ui, sans-serif; cursor: pointer; display: grid; place-items: center;
+    -webkit-tap-highlight-color: transparent; }
+  .seg .tool + .tool { border-left: 2px solid var(--line); }
+  .tool[aria-pressed="true"] { background: var(--blue); color: #fff; }
+  .tool:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+  .tool[disabled] { opacity: .45; cursor: default; }
+  .tool i { display: block; width: var(--d); height: var(--d); border-radius: 50%; background: currentColor; }
+  .paint { touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 12px; overflow: hidden;
+    background: repeating-conic-gradient(#e9e4d8 0 25%, #fff 0 50%) 0 0 / 20px 20px; }
+  canvas#brush { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+  .row { display: flex; gap: 10px; margin-top: 12px; }
+  .row .tool { flex: 0 0 auto; padding: 0 16px; border-radius: 14px; border: 2px solid var(--line); }
+  .row .big { flex: 1 1 auto; min-height: 56px; }
+  .big.ok { background: var(--ok); box-shadow: 0 4px 0 #2b7243; }
+  .big.ok:active { box-shadow: 0 2px 0 #2b7243; }
 </style>
 </head>
 <body>
@@ -130,7 +168,7 @@
     <button class="big" id="pick">📷 Photograph the drawing</button>
     <input id="file" type="file" accept="image/*" capture="environment" class="hidden">
     <ul class="tips">
-      <li>One character, plain white paper</li>
+      <li>Plain white paper (lots of drawings? you'll pick one)</li>
       <li>Arms out, legs apart</li>
       <li>Straight from above, good light</li>
     </ul>
@@ -142,11 +180,41 @@
     <p style="text-align:center" id="work-msg">Cutting out the drawing…</p>
   </section>
 
+  <section id="s-pick" class="card hidden">
+    <h2 class="pick-title">Which one is the star?</h2>
+    <p class="legend" id="pick-msg">I found more than one drawing. Tap one.</p>
+    <div class="grid" id="grid"></div>
+    <button class="big secondary" id="retake">📷 Take a new photo</button>
+  </section>
+
   <section id="s-check" class="hidden">
     <div class="card">
       <canvas id="preview"></canvas>
       <p class="desc" id="desc"></p>
       <p class="meta" id="meta"></p>
+      <button class="link hidden" id="repick">↩ Pick a different drawing</button>
+    </div>
+    <div class="card">
+      <details id="cut">
+        <summary>Bits missing or extra? Fix the cut-out</summary>
+        <p class="legend">Rub out extra paper with <b>Erase</b>. Paint back missing bits with <b>Add</b>.</p>
+        <div class="tools">
+          <div class="seg" role="group" aria-label="Brush">
+            <button class="tool" id="b-erase" aria-pressed="true">Erase</button>
+            <button class="tool" id="b-add" aria-pressed="false">Add</button>
+          </div>
+          <div class="seg" role="group" aria-label="Brush size">
+            <button class="tool size" data-size="0.03" aria-pressed="false" aria-label="Small brush"><i style="--d:8px"></i></button>
+            <button class="tool size" data-size="0.06" aria-pressed="true" aria-label="Medium brush"><i style="--d:16px"></i></button>
+            <button class="tool size" data-size="0.11" aria-pressed="false" aria-label="Big brush"><i style="--d:26px"></i></button>
+          </div>
+        </div>
+        <div class="paint"><canvas id="brush" aria-label="Paint on the drawing to fix the cut-out"></canvas></div>
+        <div class="row">
+          <button class="tool" id="undo" disabled>↶ Undo</button>
+          <button class="big ok" id="cut-done" disabled>✓ Done</button>
+        </div>
+      </details>
     </div>
     <div class="card">
       <details id="fix">
@@ -178,8 +246,9 @@ import { prepareRig, Stage } from "/static/vendor/doodlerig.js";
 
 const CODE = "__CODE__";
 const $ = (id) => document.getElementById(id);
-const show = (id) => ["s-start", "s-work", "s-check", "s-done"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
+const show = (id) => ["s-start", "s-work", "s-pick", "s-check", "s-done"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
 let draft = null, stage = null, actor = null, motions = null, busy = false;
+let upload = null;  // {id, candidates} while a photo with several drawings is on the server
 
 if (!CODE) {
   $("sub").textContent = "This link has expired. Choose “Add a star” on the TV and scan the new code.";
@@ -254,30 +323,212 @@ async function saveJoints() {
   } catch (e) { alert(e.message); } finally { busy = false; }
 }
 
+// Spinner with rotating messages while `job` runs; errors go back to the start card.
+async function working(msgs, job) {
+  $("err").classList.add("hidden");
+  $("work-msg").textContent = msgs[0];
+  show("s-work");
+  let i = 0;
+  const tick = setInterval(() => ($("work-msg").textContent = msgs[++i % msgs.length]), 1600);
+  try { await job(); } catch (e) {
+    $("err").textContent = e.message;
+    $("err").classList.remove("hidden");
+    show("s-start");
+  } finally { clearInterval(tick); }
+}
+
+const CUTTING = ["Cutting out the drawing…", "Finding elbows and knees…", "Teaching it to dance…"];
+
+async function showDraft(d) {
+  draft = d;
+  brushFor = null;
+  $("cut").open = false;
+  await loadPreview();
+  placeDots();
+  $("desc").textContent = draft.description;
+  $("meta").textContent = `ready in ${draft.seconds}s · joints by ${draft.joints_from}`;
+  $("repick").classList.toggle("hidden", !upload);
+  show("s-check");
+  $("name").focus();
+}
+
+function showPicker() {
+  const grid = $("grid");
+  grid.replaceChildren();
+  upload.candidates.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.className = "cand";
+    b.setAttribute("aria-label", `Drawing ${i + 1}`);
+    const img = document.createElement("img");
+    img.src = c.thumb;
+    img.alt = "";
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = i + 1;
+    b.append(img, n);
+    b.onclick = () => working(CUTTING, async () => {
+      await showDraft(await api(`/api/p/${CODE}/upload/${upload.id}/pick`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ box: c.box }),
+      }));
+    });
+    grid.append(b);
+  });
+  $("pick-msg").textContent = `I found ${upload.candidates.length} drawings. Tap the one to bring to life.`;
+  show("s-pick");
+}
+
 $("pick").onclick = () => $("file").click();
 $("file").onchange = async () => {
   const f = $("file").files[0];
   if (!f) return;
-  $("err").classList.add("hidden");
-  show("s-work");
-  const msgs = ["Cutting out the drawing…", "Finding elbows and knees…", "Teaching it to dance…"];
-  let i = 0;
-  const tick = setInterval(() => ($("work-msg").textContent = msgs[++i % msgs.length]), 1600);
-  try {
+  await working(["Looking for drawings…", ...CUTTING], async () => {
     const form = new FormData();
     form.append("file", f);
-    draft = await api(`/api/p/${CODE}/photo`, { method: "POST", body: form });
+    const found = await api(`/api/p/${CODE}/candidates`, { method: "POST", body: form });
+    upload = found.upload ? { id: found.upload, candidates: found.candidates } : null;
+    if (found.draft) await showDraft(found.draft);
+    else showPicker();
+  });
+  $("file").value = "";
+};
+$("retake").onclick = () => { upload = null; $("file").click(); };
+$("repick").onclick = () => { if (upload) showPicker(); };
+
+// Fix the cut-out: the child paints on the mask (white = keep), then the server rebuilds the rig.
+const brush = $("brush"), bctx = brush.getContext("2d");
+const maskC = document.createElement("canvas"), mctx = maskC.getContext("2d", { willReadFrequently: true });
+const keptC = document.createElement("canvas"), kctx = keptC.getContext("2d");
+const edgeC = document.createElement("canvas"), ectx = edgeC.getContext("2d");
+let cropImg = null, brushFor = null, mode = "erase", size = 0.06, undoStack = [], drawing = null, frame = 0;
+
+async function loadBrush() {
+  if (brushFor === draft.id) return;
+  const bust = `?v=${Date.now()}`;
+  const [crop, mask] = [new Image(), new Image()];
+  crop.src = `/api/p/${CODE}/draft/${draft.id}/crop.png${bust}`;
+  mask.src = `/api/p/${CODE}/draft/${draft.id}/mask.png${bust}`;
+  await Promise.all([crop.decode(), mask.decode()]);
+  const w = crop.naturalWidth, h = crop.naturalHeight;
+  for (const c of [brush, maskC, keptC, edgeC]) { c.width = w; c.height = h; }
+  mctx.drawImage(mask, 0, 0);
+  const px = mctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < px.data.length; i += 4) {  // grey mask -> white where kept, see-through elsewhere
+    px.data[i + 3] = px.data[i];
+    px.data[i] = px.data[i + 1] = px.data[i + 2] = 255;
+  }
+  mctx.putImageData(px, 0, 0);
+  cropImg = crop;
+  brushFor = draft.id;
+  undoStack = [];
+  syncButtons();
+  render();
+}
+
+function render() {
+  frame = 0;
+  if (!cropImg) return;
+  const { width: w, height: h } = brush;
+  // The kept part at full strength, an orange edge round it, the rest of the paper faded.
+  kctx.globalCompositeOperation = "source-over";
+  kctx.clearRect(0, 0, w, h);
+  kctx.drawImage(cropImg, 0, 0);
+  kctx.globalCompositeOperation = "destination-in";
+  kctx.drawImage(maskC, 0, 0);
+  ectx.globalCompositeOperation = "source-over";
+  ectx.clearRect(0, 0, w, h);
+  ectx.drawImage(maskC, 0, 0);
+  ectx.globalCompositeOperation = "source-in";
+  ectx.fillStyle = "#d65434";
+  ectx.fillRect(0, 0, w, h);
+  bctx.clearRect(0, 0, w, h);
+  bctx.globalAlpha = 0.3;
+  bctx.drawImage(cropImg, 0, 0);
+  bctx.globalAlpha = 1;
+  const t = Math.max(2, Math.round(Math.max(w, h) / 160));
+  for (const [dx, dy] of [[t, 0], [-t, 0], [0, t], [0, -t], [t, t], [-t, -t], [t, -t], [-t, t]]) bctx.drawImage(edgeC, dx, dy);
+  bctx.drawImage(keptC, 0, 0);
+}
+const redraw = () => { frame ||= requestAnimationFrame(render); };
+
+function syncButtons() {
+  $("b-erase").setAttribute("aria-pressed", mode === "erase");
+  $("b-add").setAttribute("aria-pressed", mode === "add");
+  document.querySelectorAll(".tool.size").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.size === size));
+  $("undo").disabled = !undoStack.length;
+  $("cut-done").disabled = !undoStack.length;
+}
+
+function toMask(e) {
+  const r = brush.getBoundingClientRect();
+  return [(e.clientX - r.left) * brush.width / r.width, (e.clientY - r.top) * brush.height / r.height];
+}
+
+function paint(from, to) {
+  mctx.globalCompositeOperation = mode === "add" ? "source-over" : "destination-out";
+  mctx.strokeStyle = mctx.fillStyle = "#fff";
+  mctx.lineWidth = size * Math.max(brush.width, brush.height);
+  mctx.lineCap = mctx.lineJoin = "round";
+  mctx.beginPath();
+  if (from) { mctx.moveTo(...from); mctx.lineTo(...to); mctx.stroke(); }
+  else { mctx.arc(...to, mctx.lineWidth / 2, 0, Math.PI * 2); mctx.fill(); }
+  redraw();
+}
+
+brush.onpointerdown = (e) => {
+  if (drawing !== null || busy || !cropImg) return;  // one finger at a time
+  e.preventDefault();
+  brush.setPointerCapture(e.pointerId);
+  undoStack.push(mctx.getImageData(0, 0, maskC.width, maskC.height));
+  if (undoStack.length > 25) undoStack.shift();
+  drawing = { id: e.pointerId, last: toMask(e) };
+  paint(null, drawing.last);
+  syncButtons();
+};
+brush.onpointermove = (e) => {
+  if (drawing?.id !== e.pointerId) return;
+  const p = toMask(e);
+  paint(drawing.last, p);
+  drawing.last = p;
+};
+brush.onpointerup = brush.onpointercancel = (e) => { if (drawing?.id === e.pointerId) drawing = null; };
+
+$("cut").ontoggle = () => { if ($("cut").open) loadBrush().catch((e) => alert(e.message)); };
+$("b-erase").onclick = () => { mode = "erase"; syncButtons(); };
+$("b-add").onclick = () => { mode = "add"; syncButtons(); };
+document.querySelectorAll(".tool.size").forEach((b) => (b.onclick = () => { size = +b.dataset.size; syncButtons(); }));
+$("undo").onclick = () => {
+  const last = undoStack.pop();
+  if (last) { mctx.putImageData(last, 0, 0); redraw(); }
+  syncButtons();
+};
+$("cut-done").onclick = async () => {
+  if (busy) return;
+  busy = true;
+  $("cut-done").disabled = true;
+  $("cut-done").textContent = "Fixing…";
+  try {
+    const out = document.createElement("canvas");  // black = drop, white = keep
+    out.width = maskC.width; out.height = maskC.height;
+    const octx = out.getContext("2d");
+    octx.fillStyle = "#000";
+    octx.fillRect(0, 0, out.width, out.height);
+    octx.drawImage(maskC, 0, 0);
+    const png = await new Promise((ok) => out.toBlob(ok, "image/png"));
+    const form = new FormData();
+    form.append("file", png, "mask.png");
+    const id = draft.id;
+    draft = await api(`/api/p/${CODE}/draft/${id}/mask`, { method: "POST", body: form });
     await loadPreview();
     placeDots();
-    $("desc").textContent = draft.description;
-    $("meta").textContent = `ready in ${draft.seconds}s · joints by ${draft.joints_from}`;
-    show("s-check");
-    $("name").focus();
-  } catch (e) {
-    $("err").textContent = e.message;
-    $("err").classList.remove("hidden");
-    show("s-start");
-  } finally { clearInterval(tick); $("file").value = ""; }
+    $("meta").textContent = `cut-out fixed in ${draft.seconds}s · joints by ${draft.joints_from}`;
+    brushFor = null;
+    $("cut").open = false;
+    $("preview").scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (e) { alert(e.message); } finally {
+    busy = false;
+    $("cut-done").textContent = "✓ Done";
+    syncButtons();
+  }
 };
 
 $("send").onclick = async () => {
@@ -293,7 +544,7 @@ $("send").onclick = async () => {
   } catch (e) { alert(e.message); } finally { $("send").disabled = false; }
 };
 
-$("again").onclick = () => { $("name").value = ""; draft = null; show("s-start"); };
+$("again").onclick = () => { $("name").value = ""; draft = null; upload = null; show("s-start"); };
 </script>
 </body>
 </html>

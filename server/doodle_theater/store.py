@@ -6,6 +6,7 @@ import secrets
 import shutil
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from .config import DATA
 
 # Four letters a child can read off the TV; no vowels, so no accidental words.
 _LETTERS = "BCDFGHJKLMNPQRSTVWXZ"
+# A photo with several drawings is kept this long, so the child can go back and pick another one.
+UPLOAD_TTL = 3600
 
 
 @dataclass
@@ -27,8 +30,9 @@ class Store:
         self.root = root
         self.rigs = root / "rigs"
         self.drafts = root / "drafts"
-        self.rigs.mkdir(parents=True, exist_ok=True)
-        self.drafts.mkdir(parents=True, exist_ok=True)
+        self.uploads = root / "uploads"
+        for d in (self.rigs, self.drafts, self.uploads):
+            d.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._sessions: dict[str, Session] = {}
 
@@ -52,6 +56,22 @@ class Store:
     def events_after(self, code: str, after: int) -> list[dict]:
         s = self.session(code)
         return [] if s is None else [e for e in s.events if e["n"] > after]
+
+    # Photos waiting for the child to pick a drawing
+    def save_upload(self, photo: bytes) -> str:
+        """Keep a photo for the picker; photos older than UPLOAD_TTL are dropped on the way."""
+        with self._lock:
+            cutoff = time.time() - UPLOAD_TTL
+            for f in self.uploads.iterdir():
+                if f.stat().st_mtime < cutoff:
+                    f.unlink(missing_ok=True)
+            upload_id = uuid.uuid4().hex[:12]
+            (self.uploads / upload_id).write_bytes(photo)
+            return upload_id
+
+    def upload(self, upload_id: str) -> bytes | None:
+        f = self.uploads / upload_id
+        return f.read_bytes() if upload_id.isalnum() and f.is_file() else None
 
     # Cast
     def _cast_file(self) -> Path:
@@ -80,6 +100,7 @@ class Store:
                 if rig_id is None or c["id"] == rig_id:
                     shutil.rmtree(self.rigs / c["id"], ignore_errors=True)
             if rig_id is None:
-                shutil.rmtree(self.drafts, ignore_errors=True)
-                self.drafts.mkdir(parents=True, exist_ok=True)
+                for d in (self.drafts, self.uploads):
+                    shutil.rmtree(d, ignore_errors=True)
+                    d.mkdir(parents=True, exist_ok=True)
             self._cast_file().write_text(json.dumps(keep, indent=1), encoding="utf-8")

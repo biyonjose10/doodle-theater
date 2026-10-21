@@ -3,6 +3,8 @@
 TV:    POST /api/pair -> code + QR · GET /api/tv/{code}/events · GET /api/cast · POST /api/cast/samples
        GET /rigs/{id}/...
 Phone: GET /p/{code} (page) · POST /api/p/{code}/photo · POST .../draft/{id}/joints · POST .../send
+       POST /api/p/{code}/candidates -> pick one: POST .../upload/{id}/pick
+       GET .../draft/{id}/crop.png|mask.png · POST .../draft/{id}/mask (the brush fix)
 """
 from __future__ import annotations
 
@@ -118,6 +120,76 @@ async def photo(code: str, file: UploadFile = File(...)):
         raise HTTPException(413, "That photo is too big.")
     try:
         return await run_in_threadpool(pipeline.make_draft, data, store.drafts)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+def _draft_or_404(draft_id: str):
+    folder = store.drafts / draft_id
+    if not draft_id.isalnum() or not (folder / "crop.png").exists():
+        raise HTTPException(404)
+    return folder
+
+
+@app.post("/api/p/{code}/candidates")
+async def find_drawings(code: str, file: UploadFile = File(...)):
+    """Every drawing on the photo, as boxes + thumbnails for the picker.
+
+    With one drawing (or none) there is nothing to pick: the draft is made straight away and
+    returned as `draft`. With several, the photo is kept under `upload` for .../pick.
+    """
+    _session_or_404(code)
+    data = await file.read()
+    if len(data) > MAX_PHOTO:
+        raise HTTPException(413, "That photo is too big.")
+    try:
+        found = await run_in_threadpool(pipeline.candidates, data)
+        if len(found) > 1:
+            return {"upload": store.save_upload(data), "candidates": found, "draft": None}
+        box = found[0]["box"] if found else None
+        draft = await run_in_threadpool(pipeline.make_draft, data, store.drafts, box)
+        return {"upload": None, "candidates": found, "draft": draft}
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+class Pick(BaseModel):
+    box: list[int] = Field(min_length=4, max_length=4)
+
+
+@app.post("/api/p/{code}/upload/{upload_id}/pick")
+async def pick(code: str, upload_id: str, body: Pick):
+    _session_or_404(code)
+    data = store.upload(upload_id)
+    if data is None:
+        raise HTTPException(404, "That photo has gone. Take it again.")
+    x0, y0, x1, y1 = body.box
+    if min(body.box) < 0 or x1 <= x0 or y1 <= y0:
+        raise HTTPException(422, "That isn't a box around a drawing.")
+    try:
+        return await run_in_threadpool(pipeline.make_draft, data, store.drafts, body.box)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/p/{code}/draft/{draft_id}/{name}")
+def draft_file(code: str, draft_id: str, name: str):
+    """The crop and its cut-out mask, for the brush. Phone-only, so behind the session code."""
+    _session_or_404(code)
+    if name not in ("crop.png", "mask.png"):
+        raise HTTPException(404)
+    return FileResponse(_draft_or_404(draft_id) / name, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p/{code}/draft/{draft_id}/mask")
+async def fix_mask(code: str, draft_id: str, file: UploadFile = File(...)):
+    _session_or_404(code)
+    _draft_or_404(draft_id)
+    data = await file.read()
+    if len(data) > MAX_PHOTO:
+        raise HTTPException(413, "That picture is too big.")
+    try:
+        return await run_in_threadpool(pipeline.fix_mask, draft_id, data, store.drafts)
     except ValueError as e:
         raise HTTPException(422, str(e))
 
