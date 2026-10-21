@@ -5,11 +5,18 @@ Feedback on each Amazon tool we used to build Doodle Theater, based on the issue
 like (F3) refer to that file.
 
 **Status note (2026-10-21):** the Fire TV app has been run end to end on the Android TV emulator.
-The AWS path (Bedrock vision, the Strands story agent, Polly, Guardrails) is written and wired,
-and its fallbacks are covered by tests, but every episode and rig produced so far came from the
-offline path while the AWS account was being set up. Points about the AWS tools below come from
-building against their APIs and docs, not yet from production use, and will be updated after the
-first live runs.
+What is now verified live on our AWS account:
+- **Polly:** neural synthesis and word speech marks work. The TV app plays the Polly MP3s with the
+  read-along highlight, checked end to end on the emulator.
+- **Guardrails:** a Bedrock Guardrail was created with `server/scripts/make_guardrail.py`;
+  `CreateGuardrail` works on the Free plan.
+- **Bedrock models:** not yet. Every Converse call to a Nova model fails with
+  `ValidationException: Operation not allowed`, and still did after the "account being verified"
+  stage ended. We filed a support case in the "Bedrock Allowlisting" category.
+
+So the Bedrock vision step and the Strands story agent are written, wired and covered by fallback
+tests, but have not yet run against a live model. Rigs and story text still come from the offline
+path. The Bedrock and Strands points below come from building against the APIs and docs.
 
 ---
 
@@ -64,8 +71,16 @@ first live runs.
   reason shown (F8).
 - Unavailability only shows up as an exception at call time. Our code has to treat "no access",
   "throttled" and "no credentials" the same way and fall back.
+- On our Free plan account, every Nova Converse call failed with
+  `ValidationException: Operation not allowed`, even after the "account being verified" stage
+  ended. Nothing in the error said this was an account allowlisting gate, or that support could
+  lift it. The only clue was that support has a "Bedrock Allowlisting" case category, so AWS
+  knows about the gate, but the API never mentions it.
 
 **Suggestions**
+- When an account-level gate blocks a call, say so in the error: name the gate (for example
+  "account not allowlisted for model invocation"), say whether it clears on its own or needs a
+  support case, and link to the right case category.
 - In the model catalog, show per account whether each model is callable, and if not, why (plan,
   form pending, region, not yet requested).
 - Add a cheap API such as `CanInvokeModel(modelId)` so apps can pick a working model at startup.
@@ -104,7 +119,8 @@ first live runs.
 - The neural voice list includes child voices (Ivy, Justin, Kevin), so characters' own lines
   can sound different from the narrator.
 - Word speech marks give the timing we need for the read-along highlight and for firing a
-  puppet action on its cue word.
+  puppet action on its cue word. Verified live: the TV app plays the MP3 and highlights each word
+  from the converted marks.
 
 **What hurt**
 - Speech mark `start`/`end` are byte offsets into the UTF-8 text. The TV indexes characters, so
@@ -129,6 +145,8 @@ first live runs.
   and what comes out.
 - Because the story path already falls back to hand-written templates on any error, a blocked
   request never leaves a child with a broken screen.
+- Creating the guardrail from code (`server/scripts/make_guardrail.py`, one `CreateGuardrail`
+  call) worked on the Free plan, even while model invocation was still blocked on the same account.
 
 **What hurt**
 - The guardrail is a separate resource created outside the code, so the app depends on an id
