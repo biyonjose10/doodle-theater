@@ -124,7 +124,7 @@ Requires Python 3.10+ (developed on 3.13). From the repo root:
 cd server
 python -m venv .venv
 # Windows: .venv\Scripts\activate      macOS/Linux: source .venv/bin/activate
-pip install fastapi uvicorn python-multipart python-dotenv segno pillow numpy opencv-python-headless boto3 strands-agents pytest
+pip install fastapi uvicorn python-multipart python-dotenv segno pillow numpy opencv-python-headless boto3 strands-agents pytest httpx
 pip install -e ../rig
 ```
 

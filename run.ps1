@@ -43,11 +43,14 @@ try {
     Write-Host ""
     Write-Host "Doodle Theater server on port $port"
     Write-Host "  TV on this Wi-Fi (Fire TV / Android TV):  http://${ip}:$port   <- 'Set server address' on the TV"
-    Write-Host "  Android TV emulator on this laptop:       http://10.0.2.2:$port   (no setup needed on port 8787)"
+    $emu = if ($port -eq "8787") { "(the app's default: no setup needed)" } else { "<- 'Set server address' on the TV" }
+    Write-Host "  Android TV emulator on this laptop:       http://10.0.2.2:$port   $emu"
     Write-Host "  Phone: scan the QR code on the TV's 'Add a star' screen."
     Write-Host "  Check it in a browser:                    http://localhost:$port/api/cast"
     Write-Host "Press Ctrl+C to stop."
     Write-Host ""
+    # uvicorn logs to stderr; with "Stop", Windows PowerShell would treat a redirected log line as fatal.
+    $ErrorActionPreference = "Continue"
     & $py -m uvicorn doodle_theater.app:app --host 0.0.0.0 --port $port
 } finally {
     Pop-Location

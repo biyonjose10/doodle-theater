@@ -103,4 +103,7 @@ class Store:
                 for d in (self.drafts, self.uploads):
                     shutil.rmtree(d, ignore_errors=True)
                     d.mkdir(parents=True, exist_ok=True)
+            elif rig_id.isalnum():
+                # The draft holds the same drawing (and /rigs/ falls back to it), so it goes too.
+                shutil.rmtree(self.drafts / rig_id, ignore_errors=True)
             self._cast_file().write_text(json.dumps(keep, indent=1), encoding="utf-8")

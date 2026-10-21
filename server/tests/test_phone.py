@@ -130,6 +130,18 @@ def test_delete_everyone_also_drops_waiting_photos(phone):
     assert list(store.uploads.iterdir()) == []
 
 
+def test_deleting_one_star_stops_serving_its_drawing(phone):
+    client, code, store = phone
+    draft_id = _photo(client, code, _one_drawing()).json()["draft"]["id"]
+    assert client.post(f"/api/p/{code}/draft/{draft_id}/send", json={"name": "Gone Soon"}).status_code == 200
+    assert client.get(f"/rigs/{draft_id}/texture.png").status_code == 200
+    client.delete(f"/api/cast/{draft_id}")
+    assert [c for c in client.get("/api/cast").json()["cast"] if c["id"] == draft_id] == []
+    for name in ("rig.json", "texture.png"):
+        assert client.get(f"/rigs/{draft_id}/{name}").status_code == 404
+    assert not (store.drafts / draft_id).exists()
+
+
 # --- Fix the cut-out ----------------------------------------------------------------------------
 
 @pytest.fixture

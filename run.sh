@@ -36,11 +36,12 @@ if [ "${1:-}" = "--setup" ]; then echo "Setup done. Start with ./run.sh"; exit 0
 
 cd "$server"
 ip="$("$py" -c 'from doodle_theater.config import lan_ip; print(lan_ip())')"
+if [ "$DT_PORT" = 8787 ]; then emu="(the app's default: no setup needed)"; else emu="<- 'Set server address' on the TV"; fi
 cat <<EOF
 
 Doodle Theater server on port $DT_PORT
   TV on this Wi-Fi (Fire TV / Android TV):  http://$ip:$DT_PORT   <- 'Set server address' on the TV
-  Android TV emulator on this laptop:       http://10.0.2.2:$DT_PORT   (no setup needed on port 8787)
+  Android TV emulator on this laptop:       http://10.0.2.2:$DT_PORT   $emu
   Phone: scan the QR code on the TV's 'Add a star' screen.
   Check it in a browser:                    http://localhost:$DT_PORT/api/cast
 Press Ctrl+C to stop.
