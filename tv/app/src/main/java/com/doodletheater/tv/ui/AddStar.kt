@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +61,8 @@ import com.doodletheater.tv.rig.RigStore
 import com.doodletheater.tv.stage.Actor
 import com.doodletheater.tv.stage.Stage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.doodletheater.tv.net.CastMember
 
 /** Name labels drawn above puppets' heads, in the app's rounded crayon font. */
 fun labelPaint(context: Context, size: Float = 40f) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -89,6 +92,42 @@ fun AddStar(api: ServerApi) {
     var arrivals by remember { mutableIntStateOf(0) }
     var spotX by remember { mutableStateOf(SLOTS[0]) }
     val paint = remember { labelPaint(context) }
+    val scope = rememberCoroutineScope()
+    var samplesBusy by remember { mutableStateOf(false) }
+
+    /** A new star walks in from the wings into the spotlight and waves. */
+    suspend fun arrive(member: CastMember) {
+        val rig = runCatching { api.rig(member) }.getOrNull() ?: return
+        val actor = Actor(rig, motions).apply {
+            label = member.name
+            x = 1.15f
+            heightFraction = 0.5f
+            feetY = FEET
+        }
+        if (actors.size >= SLOTS.size) actors.removeAt(0)
+        actors.add(actor)
+        val slot = SLOTS[(actors.size - 1) % SLOTS.size]
+        actor.walkTo(slot, clock[0], arrive = "wave")
+        spotX = slot            // the light swings over to wherever the newcomer is heading
+        arrived = member.name
+        arrivals++
+    }
+
+    // No drawing to hand: the bundled sample stars walk in one after another, like phone arrivals.
+    fun useSamples() {
+        if (samplesBusy) return
+        samplesBusy = true
+        status = "Fetching the sample stars…"
+        scope.launch {
+            runCatching { api.addSamples() }
+                .onSuccess { added ->
+                    if (added.isEmpty()) status = "The sample stars are already in your cast!"
+                    for (m in added) { arrive(m); delay(1500) }
+                }
+                .onFailure { status = "Can't reach the Doodle Theater server. Is the laptop on?" }
+            samplesBusy = false
+        }
+    }
 
     LaunchedEffect(Unit) {
         val p = runCatching { api.pair() }.getOrElse {
@@ -101,20 +140,7 @@ fun AddStar(api: ServerApi) {
             val news = runCatching { api.events(p.code, after) }.getOrDefault(emptyList())
             for ((n, member) in news) {
                 after = n
-                val rig = runCatching { api.rig(member) }.getOrNull() ?: continue
-                val actor = Actor(rig, motions).apply {
-                    label = member.name
-                    x = 1.15f
-                    heightFraction = 0.5f
-                    feetY = FEET
-                }
-                if (actors.size >= SLOTS.size) actors.removeAt(0)
-                actors.add(actor)
-                val slot = SLOTS[(actors.size - 1) % SLOTS.size]
-                actor.walkTo(slot, clock[0], arrive = "wave")
-                spotX = slot            // the light swings over to wherever the newcomer is heading
-                arrived = member.name
-                arrivals++
+                arrive(member)
             }
             delay(1000)
         }
@@ -153,6 +179,13 @@ fun AddStar(api: ServerApi) {
                 Step("📷", "Scan with a grown-up's phone")
                 Step("✂️", "Photograph your drawing")
                 Step("✨", "Watch it walk in!")
+            }
+            Spacer(Modifier.height(14.dp))
+            TvCard(onClick = ::useSamples, tint = Ink.card, width = 250, height = 40) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(if (samplesBusy) "Building the sample stars…" else "No drawing? Use sample stars",
+                        fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Ink.ink)
+                }
             }
         }
         Box(Modifier.weight(1f).fillMaxHeight()) {

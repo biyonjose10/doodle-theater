@@ -18,6 +18,8 @@ sealed interface Screen {
     data object AddStar : Screen
     data object DanceParty : Screen
     data object Lab : Screen
+    data object ServerSetup : Screen
+    data object Parents : Screen
     data class Story(val theme: Theme) : Screen
 }
 
@@ -47,27 +49,35 @@ fun App(start: Screen = Screen.Home) {
     var limit by remember { mutableStateOf(tonight.limit) }
     var left by remember { mutableStateOf(tonight.left) }
     fun storyStarted() { tonight.markWatched(); left = tonight.left }
+    fun cycleLimit() {
+        val choices = Tonight.CHOICES
+        limit = choices[(choices.indexOf(limit) + 1) % choices.size]
+        tonight.limit = limit; left = tonight.left
+    }
 
     BedtimeOverlay(on = bedtime) {
         when (val s = screen) {
             Screen.Home -> Home(
                 api,
                 onAddStar = { screen = Screen.AddStar },
+                onSetServer = { screen = Screen.ServerSetup },
+                onParents = { screen = Screen.Parents },
                 onStory = { screen = Screen.Story(it) },
                 onDanceParty = { screen = Screen.DanceParty },
                 bedtime = bedtime,
                 onToggleBedtime = { manual = !bedtime },
                 storyLimit = limit,
                 storiesLeft = left,
-                onCycleLimit = {
-                    val choices = Tonight.CHOICES
-                    limit = choices[(choices.indexOf(limit) + 1) % choices.size]
-                    tonight.limit = limit; left = tonight.left
-                },
+                onCycleLimit = ::cycleLimit,
+            )
+            Screen.Parents -> ParentCorner(
+                api, bedtime = bedtime, onToggleBedtime = { manual = !bedtime },
+                storyLimit = limit, storiesLeft = left, onCycleLimit = ::cycleLimit,
             )
             Screen.AddStar -> AddStar(api)
             Screen.DanceParty -> DanceParty(api)
             Screen.Lab -> PuppetLab()
+            Screen.ServerSetup -> ServerSetup(api, onDone = { screen = Screen.Home })
             is Screen.Story -> StoryPlayer(
                 api, s.theme, onHome = { screen = Screen.Home },
                 allowWatchAgain = { left != 0 },

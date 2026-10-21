@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import com.doodletheater.tv.BuildConfig
 import com.doodletheater.tv.rig.Rig
 import com.doodletheater.tv.rig.RigStore
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +18,9 @@ data class CastMember(val id: String, val name: String, val description: String)
 data class Pairing(val code: String, val phoneUrl: String, val qr: ImageBitmap)
 
 /** Talks to the Doodle Theater server on the family laptop. Plain HttpURLConnection: no extra libraries. */
-class ServerApi(private val context: Context, private val base: String = BuildConfig.SERVER_URL) {
+class ServerApi(private val context: Context) {
+    /** Read on every call, so a new address from the "Set server address" screen takes effect at once. */
+    val base: String get() = ServerConfig.url(context)
 
     private fun open(path: String, method: String = "GET", body: String? = null): HttpURLConnection {
         val c = URL(base + path).openConnection() as HttpURLConnection
@@ -61,6 +62,21 @@ class ServerApi(private val context: Context, private val base: String = BuildCo
     suspend fun cast(): List<CastMember> = withContext(Dispatchers.IO) {
         val arr: JSONArray = JSONObject(text("/api/cast")).getJSONArray("cast")
         (0 until arr.length()).map { member(arr.getJSONObject(it)) }
+    }
+
+    /** Add the bundled sample stars (no drawing needed); returns the ones that were new. */
+    suspend fun addSamples(): List<CastMember> = withContext(Dispatchers.IO) {
+        val o = JSONObject(text("/api/cast/samples", "POST"))
+        val added = o.getJSONArray("added").let { a -> (0 until a.length()).map { a.getString(it) }.toSet() }
+        val arr = o.getJSONArray("cast")
+        (0 until arr.length()).map { member(arr.getJSONObject(it)) }.filter { it.id in added }
+    }
+
+    /** Remove one star from the laptop, and this TV's cached copy of its puppet. */
+    suspend fun deleteOne(id: String) = withContext(Dispatchers.IO) {
+        text("/api/cast/$id", "DELETE")
+        File(context.cacheDir, "rigs/$id").deleteRecursively()
+        Unit
     }
 
     suspend fun deleteEveryone() = withContext(Dispatchers.IO) { text("/api/cast", "DELETE"); Unit }

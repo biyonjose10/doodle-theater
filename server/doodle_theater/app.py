@@ -1,6 +1,7 @@
 """HTTP API for the TV and the parent's phone.
 
-TV:    POST /api/pair -> code + QR · GET /api/tv/{code}/events · GET /api/cast · GET /rigs/{id}/...
+TV:    POST /api/pair -> code + QR · GET /api/tv/{code}/events · GET /api/cast · POST /api/cast/samples
+       GET /rigs/{id}/...
 Phone: GET /p/{code} (page) · POST /api/p/{code}/photo · POST .../draft/{id}/joints · POST .../send
 """
 from __future__ import annotations
@@ -16,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import pipeline, story, vision
+from . import pipeline, samples, story, vision
 from .story import agent, voice
 from .config import STATIC, public_url
 from .store import Store
@@ -62,6 +63,13 @@ def events(code: str, after: int = 0):
 @app.get("/api/cast")
 def cast():
     return {"cast": store.cast()}
+
+
+@app.post("/api/cast/samples")
+async def add_samples():
+    """Three ready-made stars for anyone without a drawing. Safe to call twice: no duplicates."""
+    added = await run_in_threadpool(samples.add_samples, store)
+    return {"added": [c["id"] for c in added], "cast": store.cast()}
 
 
 @app.delete("/api/cast")

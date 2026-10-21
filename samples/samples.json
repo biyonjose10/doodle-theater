@@ -1,0 +1,8 @@
+[
+  {"id": "samplecrown", "name": "Captain Crown", "description": "a purple fellow with a spiky crown and a round tummy", "drawing": "crown.png", "mask": "crown_mask.png",
+   "joints": {"root": [264, 397], "hip": [264, 397], "torso": [247, 232], "neck": [231, 119], "right_shoulder": [151, 245], "right_elbow": [99, 278], "right_hand": [46, 311], "left_shoulder": [343, 218], "left_elbow": [396, 245], "left_hand": [449, 278], "right_hip": [191, 404], "right_knee": [165, 476], "right_foot": [138, 556], "left_hip": [337, 390], "left_knee": [376, 456], "left_foot": [409, 549]}},
+  {"id": "samplepippa", "name": "Pippa Pigtails", "description": "a smiley girl with two bouncy pigtails and a swishy skirt", "drawing": "pippa.png", "mask": "pippa_mask.png",
+   "joints": {"root": [166, 248], "hip": [166, 248], "torso": [166, 133], "neck": [169, 51], "right_shoulder": [134, 133], "right_elbow": [82, 142], "right_hand": [21, 150], "left_shoulder": [199, 133], "left_elbow": [255, 137], "left_hand": [316, 146], "right_hip": [143, 250], "right_knee": [147, 320], "right_foot": [147, 380], "left_hip": [190, 246], "left_knee": [195, 320], "left_foot": [199, 380]}},
+  {"id": "samplecandy", "name": "Candy Corn Carl", "description": "a stripy candy corn with orange arms and big yellow shoes", "drawing": "candy.png", "mask": "candy_mask.png",
+   "joints": {"root": [278, 351], "hip": [278, 351], "torso": [297, 226], "neck": [308, 145], "right_shoulder": [183, 218], "right_elbow": [124, 196], "right_hand": [65, 145], "left_shoulder": [411, 233], "left_elbow": [477, 226], "left_hand": [528, 152], "right_hip": [205, 351], "right_knee": [205, 424], "right_foot": [205, 497], "left_hip": [352, 351], "left_knee": [352, 431], "left_foot": [352, 505]}}
+]

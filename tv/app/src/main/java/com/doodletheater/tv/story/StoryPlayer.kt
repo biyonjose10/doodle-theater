@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
@@ -63,6 +64,7 @@ import com.doodletheater.tv.stage.Actor
 import com.doodletheater.tv.stage.Stage
 import com.doodletheater.tv.ui.Baloo
 import com.doodletheater.tv.ui.Ink
+import com.doodletheater.tv.ui.TagPill
 import com.doodletheater.tv.ui.Theme
 import com.doodletheater.tv.ui.TvCard
 import com.doodletheater.tv.ui.labelPaint
@@ -89,6 +91,7 @@ private val LOOPING = setOf("walk", "run", "dance", "wave", "cheer", "scared", "
  * Plays an episode: backdrops, puppets, narration with read-along captions, word-timed
  * stage directions, and a choice the child makes with the remote.
  * ◀ ▶ picks a star and OK makes them jump at any moment; ⏯ / "Alexa, pause" pauses.
+ * At a choice, ⏭ / "Alexa, next" picks the RIGHT option and ⏮ / "Alexa, previous" the LEFT one.
  */
 @Composable
 fun StoryPlayer(
@@ -119,19 +122,37 @@ fun StoryPlayer(
     val picked = remember { arrayOfNulls<CompletableDeferred<String>>(1) }
     val keys = remember { FocusRequester() }
     val firstOption = remember { FocusRequester() }
+    val secondOption = remember { FocusRequester() }
+    var voicePick by remember { mutableIntStateOf(-1) }      // option chosen by ⏮/⏭ or Alexa, shown before it plays
+    val scope = rememberCoroutineScope()
     val night = remember { Animatable(0f) }               // darkness of the wind-down overlay
 
-    // Media session: Fire TV routes "Alexa, pause/resume" and the remote's ⏯ here.
+    /** Pick option [i] (0 = LEFT, 1 = RIGHT) hands-free: light the card up for a moment, then go. */
+    fun pickHandsFree(i: Int) {
+        val choosing = phase as? Phase.Choosing ?: return
+        val option = choosing.choice.options.getOrNull(i) ?: return
+        if (voicePick != -1) return
+        voicePick = i
+        runCatching { (if (i == 0) firstOption else secondOption).requestFocus() }
+        scope.launch { delay(900); picked[0]?.complete(option.next) }
+    }
+
+    // Media session: Fire TV routes "Alexa, pause/resume/next/previous" and the remote's ⏯ ⏮ ⏭ here.
     DisposableEffect(Unit) {
         val session = MediaSession(context, "DoodleTheater")
         fun state(playing: Boolean) = session.setPlaybackState(PlaybackState.Builder()
-            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE)
+            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE or
+                PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS)
             .setState(if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, 0, 1f).build())
         session.setCallback(object : MediaSession.Callback() {
             override fun onPlay() { paused = false; narrator.resume(); state(true) }
             override fun onPause() { paused = true; narrator.pause(); state(false) }
             override fun onStop() { paused = true; narrator.stop(); state(false) }
+            override fun onSkipToNext() = pickHandsFree(1)
+            override fun onSkipToPrevious() = pickHandsFree(0)
         })
+        @Suppress("DEPRECATION")  // Fire OS 6 (API 25) still needs these flags to receive media buttons.
+        session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
         state(true)
         session.isActive = true
         onDispose { session.release(); narrator.shutdown() }
@@ -246,6 +267,7 @@ fun StoryPlayer(
             val choice = scene.choice
             scene = if (choice != null) {
                 caption = null
+                voicePick = -1
                 phase = Phase.Choosing(choice)
                 val wait = CompletableDeferred<String>().also { picked[0] = it }
                 narrator.speak("${choice.prompt} ${choice.options[0].label}, or ${choice.options[1].label}?", 1.0f, 0.92f) { _, _ -> }
@@ -286,6 +308,9 @@ fun StoryPlayer(
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (e.key == Key.MediaPlayPause || e.key == Key.MediaPause || e.key == Key.MediaPlay) {
                     paused = !paused; if (paused) narrator.pause() else narrator.resume(); return@onPreviewKeyEvent true
+                }
+                if (e.key == Key.MediaNext || e.key == Key.MediaPrevious) {
+                    pickHandsFree(if (e.key == Key.MediaNext) 1 else 0); return@onPreviewKeyEvent true
                 }
                 if (phase != Phase.Playing || actors.isEmpty()) return@onPreviewKeyEvent false
                 when (e.key) {
@@ -331,7 +356,7 @@ fun StoryPlayer(
             is Phase.Loading -> Banner(p.message, "Dance while you wait!")
             is Phase.Failed -> Banner(p.message, "Press Back to go home")
             Phase.Title -> episode?.let { Banner(it.title, theme.title) }
-            is Phase.Choosing -> ChoiceCards(p.choice, firstOption) { picked[0]?.complete(it) }
+            is Phase.Choosing -> ChoiceCards(p.choice, firstOption, secondOption, voicePick) { picked[0]?.complete(it) }
             Phase.Ended -> GoodnightCard(episode?.cast?.map { it.name }.orEmpty(), firstOption,
                 onAgain = { run++ }, onHome = onHome, allowWatchAgain = allowWatchAgain())
             Phase.Playing, Phase.WindDown -> {}
@@ -357,7 +382,7 @@ private fun Banner(title: String, subtitle: String) {
 }
 
 @Composable
-private fun ChoiceCards(choice: Choice, first: FocusRequester, onPick: (String) -> Unit) {
+private fun ChoiceCards(choice: Choice, first: FocusRequester, second: FocusRequester, chosen: Int, onPick: (String) -> Unit) {
     Column(Modifier.fillMaxSize().padding(bottom = 36.dp), verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.CenterHorizontally) {
         // Paper card rather than a dark strip: readable on every crayon backdrop.
@@ -367,29 +392,37 @@ private fun ChoiceCards(choice: Choice, first: FocusRequester, onPick: (String) 
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
             choice.options.forEachIndexed { i, o ->
                 TvCard(onClick = { onPick(o.next) }, tint = if (i == 0) Ink.accent else Ink.blue, width = 320, height = 104,
-                    modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) {
-                    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        // The picture, for children who can't read the option yet (older episodes have none).
-                        if (o.emoji.isNotBlank()) {
-                            Box(Modifier.size(56.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
-                                contentAlignment = Alignment.Center) {
-                                Text(o.emoji, fontSize = 30.sp, lineHeight = 34.sp, textAlign = TextAlign.Center)
+                    modifier = Modifier.focusRequester(if (i == 0) first else second)) {
+                    Box(Modifier.fillMaxSize()) {
+                        Row(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            // The picture, for children who can't read the option yet (older episodes have none).
+                            if (o.emoji.isNotBlank()) {
+                                Box(Modifier.size(56.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
+                                    contentAlignment = Alignment.Center) {
+                                    Text(o.emoji, fontSize = 30.sp, lineHeight = 34.sp, textAlign = TextAlign.Center)
+                                }
+                                Spacer(Modifier.width(14.dp))
                             }
-                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                                // Which way to press, for the same reason.
+                                Text(if (i == 0) "◀  LEFT" else "RIGHT  ▶", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 12.sp, color = Ink.ink,
+                                    modifier = Modifier.background(Ink.paper, RoundedCornerShape(50)).padding(horizontal = 10.dp))
+                                Spacer(Modifier.height(6.dp))
+                                Text(o.label, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp,
+                                    color = Color.White, lineHeight = 22.sp)
+                            }
                         }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                            // Which way to press, for the same reason.
-                            Text(if (i == 0) "◀  LEFT" else "RIGHT  ▶", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold,
-                                fontSize = 12.sp, color = Ink.ink,
-                                modifier = Modifier.background(Ink.paper, RoundedCornerShape(50)).padding(horizontal = 10.dp))
-                            Spacer(Modifier.height(6.dp))
-                            Text(o.label, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp,
-                                color = Color.White, lineHeight = 22.sp)
-                        }
+                        if (chosen == i) TagPill("✓ Picked!", Modifier.align(Alignment.TopEnd).padding(8.dp), size = 12)
                     }
                 }
             }
         }
+        Spacer(Modifier.height(10.dp))
+        // Hands-free: Fire TV turns "Alexa, next / previous" (and the remote's ⏭ ⏮) into right / left.
+        Text("or say “Alexa, next” for RIGHT · “Alexa, previous” for LEFT", fontFamily = Baloo,
+            fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Ink.soft,
+            modifier = Modifier.background(Ink.paper.copy(alpha = 0.9f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 1.dp))
     }
 }

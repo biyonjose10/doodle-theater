@@ -35,3 +35,6 @@ demo/raw/
 submission/clips/*_v1.mp4
 submission/final/*-v1.mp4
 submission/final/*-preview*.mp4
+
+# Built TV app for judges (attached to the GitHub Release instead)
+dist/

@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,8 @@ import androidx.compose.foundation.layout.width
 import androidx.tv.material3.Glow
 import com.doodletheater.tv.net.CastMember
 import com.doodletheater.tv.net.ServerApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 data class Theme(val id: String, val title: String, val emoji: String, val tint: Color, val blurb: String)
 
@@ -60,6 +63,8 @@ val THEMES = listOf(
 fun Home(
     api: ServerApi,
     onAddStar: () -> Unit,
+    onSetServer: () -> Unit = {},
+    onParents: () -> Unit = {},
     onStory: (Theme) -> Unit,
     onDanceParty: () -> Unit,
     bedtime: Boolean = false,
@@ -71,14 +76,36 @@ fun Home(
     var cast by remember { mutableStateOf<List<CastMember>>(emptyList()) }
     var thumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
     var offline by remember { mutableStateOf(false) }
+    var loaded by remember { mutableStateOf(false) }
+    var samplesBusy by remember { mutableStateOf(false) }
     val first = remember { FocusRequester() }
+    val serverCard = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
+    suspend fun load() {
         runCatching { api.cast() }.onSuccess { list ->
             cast = list.reversed()
             thumbs = list.associate { m -> m.id to api.image("/rigs/${m.id}/texture.png") }
+            offline = false
         }.onFailure { offline = true }
+        loaded = true
+    }
+
+    LaunchedEffect(Unit) {
+        load()
         runCatching { first.requestFocus() }
+    }
+    // Can't reach the laptop: put the remote straight on "Set server address".
+    LaunchedEffect(offline) { if (offline) runCatching { delay(100); serverCard.requestFocus() } }
+
+    fun addSamples() {
+        if (samplesBusy) return
+        samplesBusy = true
+        scope.launch {
+            runCatching { api.addSamples() }.onFailure { offline = true }
+            load()
+            samplesBusy = false
+        }
     }
 
     Column(
@@ -93,13 +120,15 @@ fun Home(
             Spacer(Modifier.width(8.dp))
             KeyHint("OK", "choose")
             Spacer(Modifier.width(10.dp))
+            PillButton("👪 Parents", onParents)
+            Spacer(Modifier.width(10.dp))
             BedtimeChip(on = bedtime, onToggle = onToggleBedtime)
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (offline) "Can't reach the laptop. Start the Doodle Theater server, then come back."
+                if (offline) "Can't reach the laptop at ${api.base}. Start the server, or set its address."
                 else if (storiesLeft == 0) "That's all the stories for tonight. Goodnight! 🌙"
-                else if (cast.isEmpty()) "Draw a character, then add them as a star!"
+                else if (cast.isEmpty()) "Draw a character and add them as a star, or try the sample stars!"
                 else "Tonight's stars: ${cast.joinToString(", ") { it.name }}",
                 fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Ink.soft,
                 modifier = Modifier.weight(1f),
@@ -111,10 +140,16 @@ fun Home(
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
             item {
                 TvCard(onClick = onAddStar, modifier = Modifier.focusRequester(first), tint = Ink.accent) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("＋\nAdd a star", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp,
-                            color = Color.White, lineHeight = 20.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    }
+                    CardLabel("＋\nAdd a star")
+                }
+            }
+            if (offline) item {
+                TvCard(onClick = onSetServer, modifier = Modifier.focusRequester(serverCard), tint = Ink.blue) {
+                    CardLabel("⚙\nSet server\naddress")
+                }
+            } else if (loaded && cast.isEmpty()) item {
+                TvCard(onClick = ::addSamples, tint = Ink.blue) {
+                    CardLabel(if (samplesBusy) "✨\nBuilding\nthe stars…" else "✨\nTry sample\nstars")
                 }
             }
             items(cast, key = { it.id }) { m ->
@@ -150,6 +185,15 @@ fun Home(
                 }
             }
         }
+    }
+}
+
+/** Big white words centred on a coloured card ("＋ Add a star", "✨ Try sample stars"). */
+@Composable
+private fun CardLabel(text: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(text, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp,
+            color = Color.White, lineHeight = 20.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
