@@ -30,3 +30,8 @@ demo/raw/
 .env.*
 !.env.example
 .claude/
+
+# Local backups and phone-sized previews of the demo media (the committed history has v1)
+submission/clips/*_v1.mp4
+submission/final/*-v1.mp4
+submission/final/*-preview*.mp4

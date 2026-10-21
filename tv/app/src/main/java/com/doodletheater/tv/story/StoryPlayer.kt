@@ -239,9 +239,10 @@ fun StoryPlayer(
         phase = Phase.Playing
         keys.requestFocus()
         var scene: Scene? = ep.scenes.getValue("start")
+        var lastLine = ""
         while (scene != null) {
             backdrop = scene.backdrop
-            for (b in scene.beats) beat(b, ep)
+            for (b in scene.beats) { beat(b, ep); lastLine = b.text }
             val choice = scene.choice
             scene = if (choice != null) {
                 caption = null
@@ -260,8 +261,11 @@ fun StoryPlayer(
         actors.forEach { it.playFor("wave", clock[0], 1.2) }   // wave is a 1.2 s loop: once, then idle
         coroutineScope {
             val dim = launch { dimToNight(9_000) }
-            waitWhilePaused()
-            narrator.speak("The end!", 1.0f, 0.85f) { _, _ -> }
+            // Stories usually close with "The end!" already; only say it when the last line didn't.
+            if (!lastLine.trimEnd().endsWith("The end!", ignoreCase = true)) {
+                waitWhilePaused()
+                narrator.speak("The end!", 1.0f, 0.85f) { _, _ -> }
+            }
             pausableDelay(1_200)
             val names = joinNames(ep.cast.map { it.name })
             waitWhilePaused()
