@@ -154,7 +154,7 @@ class StoryRequest(BaseModel):
 @app.post("/api/story")
 async def new_story(body: StoryRequest):
     everyone = {c["id"]: c for c in store.cast()}
-    chosen = [everyone[i] for i in body.cast if i in everyone] or list(everyone.values())[-3:]
+    chosen = [everyone[i] for i in body.cast if i in everyone] or list(everyone.values())[-4:]
     try:
         ep = await run_in_threadpool(story.make_episode, body.theme, chosen, store.root / "episodes",
                                      story_writer())
