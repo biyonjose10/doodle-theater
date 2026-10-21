@@ -1,0 +1,118 @@
+{
+  "format": "doodlerig-motions",
+  "version": 1,
+  "units": {
+    "joint": "rotation in degrees about that joint, positive = clockwise on screen (y points down)",
+    "root.x / root.y": "offset as a fraction of the character's height, +y = down",
+    "root.sx / root.sy": "scale about the point between the feet",
+    "sides": "right_* is the character's right (image left): + raises it outward; left_*: - raises it outward"
+  },
+  "curves": {
+    "sin": "[amp, cycles, phase, offset] -> offset + amp*sin(2pi*(cycles*t/duration + phase))",
+    "abs_sin": "same, but amp*|sin(...)| (a bounce: two humps per cycle)",
+    "pos_sin": "same, but amp*max(0, sin(...)) (half the cycle active, for alternating legs)",
+    "keys": "[[t_seconds, value], ...] smoothstep between keys, held at the ends"
+  },
+  "motions": {
+    "idle": {
+      "duration": 2.4, "loop": true,
+      "channels": {
+        "torso": {"sin": [2, 1, 0, 0]},
+        "right_shoulder": {"sin": [4, 1, 0, 0]},
+        "left_shoulder": {"sin": [4, 1, 0.5, 0]},
+        "root.sy": {"sin": [0.015, 1, 0.25, 1]}
+      }
+    },
+    "walk": {
+      "duration": 0.8, "loop": true,
+      "channels": {
+        "right_hip": {"pos_sin": [10, 1, 0, 0]},
+        "right_knee": {"pos_sin": [28, 1, 0, 0]},
+        "left_hip": {"pos_sin": [-10, 1, 0.5, 0]},
+        "left_knee": {"pos_sin": [-28, 1, 0.5, 0]},
+        "right_shoulder": {"sin": [15, 1, 0, 0]},
+        "left_shoulder": {"sin": [15, 1, 0, 0]},
+        "torso": {"sin": [4, 1, 0.25, 0]},
+        "root.y": {"abs_sin": [-0.025, 1, 0, 0]}
+      }
+    },
+    "run": {
+      "duration": 0.5, "loop": true,
+      "channels": {
+        "right_hip": {"pos_sin": [16, 1, 0, 0]},
+        "right_knee": {"pos_sin": [45, 1, 0, 0]},
+        "left_hip": {"pos_sin": [-16, 1, 0.5, 0]},
+        "left_knee": {"pos_sin": [-45, 1, 0.5, 0]},
+        "right_shoulder": {"sin": [30, 1, 0, 10]},
+        "left_shoulder": {"sin": [30, 1, 0, -10]},
+        "right_elbow": {"sin": [20, 1, 0, 20]},
+        "left_elbow": {"sin": [20, 1, 0, -20]},
+        "torso": {"sin": [6, 1, 0.25, 0]},
+        "root.y": {"abs_sin": [-0.05, 1, 0, 0]}
+      }
+    },
+    "jump": {
+      "duration": 1.0, "loop": false,
+      "channels": {
+        "root.y": {"keys": [[0, 0], [0.18, 0.03], [0.5, -0.4], [0.82, 0], [0.9, 0.02], [1.0, 0]]},
+        "root.sy": {"keys": [[0, 1], [0.18, 0.86], [0.3, 1.08], [0.5, 1.0], [0.82, 1.0], [0.9, 0.9], [1.0, 1]]},
+        "root.sx": {"keys": [[0, 1], [0.18, 1.08], [0.3, 0.95], [0.5, 1.0], [0.82, 1.0], [0.9, 1.08], [1.0, 1]]},
+        "right_shoulder": {"keys": [[0, 0], [0.18, -10], [0.45, 70], [0.82, 10], [1.0, 0]]},
+        "left_shoulder": {"keys": [[0, 0], [0.18, 10], [0.45, -70], [0.82, -10], [1.0, 0]]},
+        "right_knee": {"keys": [[0, 0], [0.18, 15], [0.4, 0], [0.9, 12], [1.0, 0]]},
+        "left_knee": {"keys": [[0, 0], [0.18, -15], [0.4, 0], [0.9, -12], [1.0, 0]]}
+      }
+    },
+    "wave": {
+      "duration": 1.2, "loop": true,
+      "channels": {
+        "right_shoulder": {"sin": [6, 1, 0, 75]},
+        "right_elbow": {"sin": [30, 2, 0, 20]},
+        "left_shoulder": {"sin": [3, 1, 0, 0]},
+        "torso": {"sin": [3, 1, 0, 0]}
+      }
+    },
+    "dance": {
+      "duration": 1.0, "loop": true,
+      "channels": {
+        "torso": {"sin": [10, 1, 0, 0]},
+        "right_shoulder": {"sin": [45, 1, 0, 20]},
+        "left_shoulder": {"sin": [45, 1, 0, -20]},
+        "right_elbow": {"sin": [30, 2, 0, 0]},
+        "left_elbow": {"sin": [-30, 2, 0, 0]},
+        "right_knee": {"pos_sin": [25, 1, 0, 0]},
+        "left_knee": {"pos_sin": [-25, 1, 0.5, 0]},
+        "root.x": {"sin": [0.05, 1, 0, 0]},
+        "root.y": {"abs_sin": [-0.04, 1, 0, 0]}
+      }
+    },
+    "cheer": {
+      "duration": 0.9, "loop": true,
+      "channels": {
+        "right_shoulder": {"sin": [12, 2, 0, 80]},
+        "left_shoulder": {"sin": [-12, 2, 0, -80]},
+        "right_elbow": {"sin": [15, 2, 0, 0]},
+        "left_elbow": {"sin": [-15, 2, 0, 0]},
+        "root.y": {"abs_sin": [-0.07, 1, 0, 0]}
+      }
+    },
+    "spin": {
+      "duration": 1.0, "loop": false,
+      "channels": {
+        "root.sx": {"sin": [1, 1, 0.25, 0]},
+        "root.y": {"keys": [[0, 0], [0.5, -0.08], [1.0, 0]]},
+        "right_shoulder": {"keys": [[0, 0], [0.5, 40], [1.0, 0]]},
+        "left_shoulder": {"keys": [[0, 0], [0.5, -40], [1.0, 0]]}
+      }
+    },
+    "scared": {
+      "duration": 0.6, "loop": true,
+      "channels": {
+        "root.x": {"sin": [0.012, 6, 0, 0]},
+        "right_shoulder": {"sin": [4, 3, 0, -20]},
+        "left_shoulder": {"sin": [4, 3, 0.5, 20]},
+        "root.sy": {"sin": [0.01, 3, 0, 0.95]}
+      }
+    }
+  }
+}

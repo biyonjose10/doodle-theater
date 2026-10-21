@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>doodlerig player</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fffaf0; --ink: #222; --chip: #fff; --line: #ddd; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1a17; --ink: #eee; --chip: #2a2925; --line: #444; } }
+  body { margin: 0; font: 16px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  canvas { width: 100%; aspect-ratio: 4 / 3; background: repeating-linear-gradient(0deg, transparent 0 27px, var(--line) 27px 28px); border-radius: 12px; }
+  .moves { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--chip); color: var(--ink); cursor: pointer; }
+  code { background: var(--chip); padding: 2px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>doodlerig player</h1>
+  <p>Plays a rig made by <code>doodlerig photo.jpg -o rigs/mine</code>. Pass <code>?rig=rigs/mine</code> (served over HTTP, e.g. <code>python -m http.server</code> from the repo root).</p>
+  <canvas id="stage"></canvas>
+  <div class="moves" id="moves"></div>
+</main>
+<script type="module">
+  import { loadRig, loadMotions, Stage } from "./doodlerig.js";
+  const params = new URLSearchParams(location.search);
+  const rigUrl = params.get("rig") || "../examples/char1";
+  const motions = await loadMotions("../doodlerig/motions.json");
+  const stage = new Stage(document.getElementById("stage"), motions);
+  const actor = stage.add(await loadRig(rigUrl), { x: 0.5, scale: 0.75, motion: "idle" });
+  for (const name of Object.keys(motions)) {
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.onclick = () => stage.play(actor, name);
+    document.getElementById("moves").append(b);
+  }
+  stage.run();
+</script>
+</body>
+</html>

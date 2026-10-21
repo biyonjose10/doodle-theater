@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doodlerig"
+version = "0.1.0"
+description = "Turn a photo of a hand-drawn character into a rigged 2D puppet (texture + mesh + skeleton + skin weights) that any renderer can animate."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python-headless>=4.8",
+    "scipy>=1.11",
+    "pillow>=10",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+doodlerig = "doodlerig.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["doodlerig*"]
+
+[tool.setuptools.package-data]
+doodlerig = ["motions.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
