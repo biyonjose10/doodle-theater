@@ -120,9 +120,9 @@ script / FRICTION.md in the editor.
 
 ## Clipchamp cut list
 
-Every time below was checked against the files on 2026-10-21 (ffprobe for lengths, frame grabs
-and silence detection for the moments). **Total: 2:18.5**, well under 3:00. If clip C comes out
-longer or shorter than 12 s, everything after it simply shifts by the difference.
+This matches the rendered `final\doodle-theater-demo.mp4` (built by `build_video.py`; every time
+was checked on the render on 2026-10-21 with frame grabs and silence detection). **Total:
+2:35.3**, well under 3:00. You only need it if you rebuild the video by hand in Clipchamp.
 
 ### Clipchamp in five steps (first time)
 
@@ -153,78 +153,90 @@ volume given, so the voice-over is heard over it. Clipchamp has no automatic duc
 
 ### Timeline (video row)
 
-"src" times are inside the source file; timeline times are in the finished video.
+"src" times are inside the source file; timeline times are in the finished video. Clips were
+re-recorded on 2026-10-21 with the new TV UI and phone page (first takes kept as `clips\*_v1.mp4`).
+"xfade" = a crossfade of that length from the previous row.
 
 | # | Timeline | Source file | In → out (src) | Length | Notes |
 |---|---|---|---|---|---|
-| 1 | 0:00.0–0:07.0 | `images\drawings_photo.webp` | still | 7.0 s | Slow zoom if your Clipchamp has a zoom effect (right panel, **Effects**); otherwise leave it still. Fade in 0.5 s. |
-| 2 | 0:07.0–0:19.5 | `clips\home_add.mp4` | 0.0 → 12.5 | 12.5 s | Home screen, focus moving across the stars and themes. No sound in this file. |
-| 3a | 0:19.5–0:25.0 | `clips\home_add.mp4` | 12.5 → 18.0 | 5.5 s | *Add a star* opens; QR and code appear at src 14.0 (timeline 0:21.0). |
-| 3C | 0:25.0–0:37.0 | **clip C (your phone recording)** | pick ~12 s | ~12 s | Keep in this order: photo taken → puppet moving on the phone → one joint dot dragged → name typed → **Send** tapped. Mute it. |
-| 3b | 0:37.0–0:48.5 | `clips\home_add.mp4` | 22.5 → 34.0 | 11.5 s | "Waiting for a drawing…", then **"Queen Whiskers has arrived!" at src 24.2** (timeline 0:38.7); she walks in from the right until ~src 28 and waves from ~src 28.5. |
-| 4a | 0:48.5–1:17.8 | `clips\story_sound.mp4` | 12.5 → 41.8 | 29.3 s | Skips the 12 s "Writing tonight's story" wait. Title card at src 13; narration starts src 14.9; "What should they do?" appears src 32.25; focus moves to *Swim through the kelp* src 35.75; kelp scene src 38.0. |
-| 4b | 1:17.8–1:22.3 | `clips\story_sound.mp4` | 50.9 → 55.4 | 4.5 s | Jump to the last words: "The end!" (src 51.55) and the **The End** screen (src 52.1). Put a 0.3 s crossfade between 4a and 4b. |
-| 5 | 1:22.3–1:30.4 | `clips\pause_sound.mp4` | 21.5 → 29.6 | 8.1 s | Space story. Professor Noodles' line "Look! A little star…" starts src 24.2; **Paused** at src 25.55 (timeline 1:26.35); resumes src 28.6 (timeline 1:29.4). **Out point must be 29.6**: the picture ends there even though the file's audio runs to 41.4 s. |
-| 6 | 1:30.4–1:41.8 | `clips\party.mp4` | 18.5 → 29.9 | 11.4 s | Dance party; everybody starts dancing at ~src 22.75 (timeline 1:34.65). No sound in this file. |
-| 7a | 1:41.8–1:53.3 | `images\diagram.png` | still | 11.5 s | Architecture diagram. Slow zoom if available. |
-| 7b | 1:53.3–2:04.7 | `clips\story_sound.mp4` | 41.8 → 50.9 at **speed 0.8×** | 11.4 s | Part of the story not used in scene 4 (turtle and shell lines). **Mute it.** Caption below. |
-| 7c | 2:04.7–2:08.3 | `images\rig_skeletons.png` | still | 3.6 s | The 4-up joint overlay. It is 1238×400, so it sits letterboxed; that's fine. |
-| 7c | 2:08.3–2:11.5 | `images\cat_walk.gif` | whole GIF, twice | 3.2 s | The GIF is 1.6 s long: drop it on the timeline twice, back to back. |
-| 8 | 2:11.5–2:18.5 | `images\endcard.png` | still | 7.0 s | Fade out the last 1.0 s (picture and sound). |
+| 1 | 0:00.0–0:07.5 | `images\drawings_photo.webp` | still | 7.5 s | Slow zoom 1.0→1.12. Fade in 0.6 s. |
+| 2 | 0:07.0–0:24.5 | `clips\home_add.mp4` | 1.5 → 12.0, then 12.0 → 18.0 at **3×**, then 18.0 → 23.0 | 17.5 s | xfade 0.5. Daytime Home (Bedtime OFF): focus over the stars with the ★ Selected tag (src 2.5–7), the themes (7.5–11); back to *Add a star* (sped up); Add a star opens src 19.5, **QR at src 20.5 (timeline 0:22.0)**. No sound in this file. |
+| 3C | 0:24.2–0:37.7 | `clips\phone.mp4` | 4.3 → 9.25; 11.9 → 17.5 at **1.5×**; 17.5 → 22.3 | 13.5 s | xfade 0.3. Top 182 px (status + URL bar) cropped, on cream with rounded corners. Step bar 1 Photo → 2 Check (cut-out spinner src 7.8, "Finding elbows and knees" 8.8) → cat preview 9.25; src 9.3–11.7 skipped (a stray keyboard); name typed 17.9–19.9; Send ~21.0; "Queen Whiskers is on the TV now!" with all three steps ticked at 21.5 (timeline 0:37.1). `images\rig_skeletons.png` (cat only, crop 320×400) beside the phone from 0:31.9. Muted. |
+| 3b | 0:37.4–0:46.9 | `clips\home_add.mp4` | 28.7 → 38.2 | 9.5 s | xfade 0.3. "🎉 Queen Whiskers has arrived!" pops up at **src 30.4 (timeline 0:39.1)**; she walks in to ~src 34 and waves from ~34.5. |
+| 4 | 0:46.9–1:17.3 | `clips\story_sound.mp4` | 12.1 → 42.5 | 30.4 s | Cut. Under the Sea, daytime. Title card src 12.3; narration from src 14.1; **"What should they do?" with the emoji picture cards at src 32.3 (timeline 1:07.1)**; focus moves to *Swim through the kelp* src 36.0 (1:10.8); kelp scene src 38.0 (1:12.8). The story's wind-down and Goodnight card are shown in scene 6b instead. |
+| 5 | 1:17.3–1:26.0 | `clips\pause_sound.mp4` | 19.3 → 28.0 | 8.7 s | Cut. Space story. "Look! A little star…" starts src 23.0; **Paused at src 23.33 (timeline 1:21.3)**; resumes src 26.42 (1:24.4). |
+| 6 | 1:26.0–1:37.4 | `clips\party.mp4` | 18.5 → 29.95 | 11.5 s | Cut. Dance party with the spotlight and the Selected / Now dancing tags; everybody dances from ~src 23 (timeline 1:30.5). No sound in this file. |
+| 6b | 1:37.1–1:58.2 | `clips\bedtime.mp4` | 3.0 → 5.0; 5.0 → 10.4 **cropped to the top-right 1280×720 (x 640, y 0)**; 79.3 → 93.0 | 21.1 s | xfade 0.3. Home at night with **🌙 Bedtime ON** (warm, dim); the punch-in shows focus on **📖 Stories tonight** (src 5.3–7.5, timeline 1:39.4) and on **🌙 Bedtime ON** (src 7.8–10.3, 1:41.9). Cut at 1:44.5 to the end of the bedtime Space story: "…everyone yawned a big, sleepy yawn. The end!"; the wind-down starts src 81.0 (1:46.2): stars wave, the stage dims to night with a moon and twinkling stars over 9 s; the **Goodnight card** (🔁 Watch again / 🏠 Home) at src 90.6 (1:55.9). |
+| 7a | 1:57.8–2:12.4 | `images\diagram.png` | still | 14.6 s | xfade 0.4. Slow zoom 1.0→1.06. |
+| 7b | 2:12.1–2:21.1 | `clips\story_sound.mp4` | 42.5 → 51.5 at 1× | 9.0 s | xfade 0.3. The rest of the kelp scene (turtle and shell lines). **Muted.** |
+| 7c | 2:20.8–2:24.4 | `images\rig_skeletons.png` | still | 3.6 s | xfade 0.3. The 4-up joint overlay, letterboxed. |
+| 7c | 2:24.1–2:27.3 | `images\cat_walk.gif` | whole GIF, twice | 3.2 s | xfade 0.3. |
+| 8 | 2:26.8–2:35.3 | `images\endcard.png` | still | 8.5 s | xfade 0.5. Fade out the last 1.0 s (picture and sound). |
+
+**Total: 2:35.3** (155.3 s).
 
 ### Voice-over row
 
-Drop each MP3 so it **starts** at the time given. None of them overlap.
+Each MP3 **starts** at the time given. None of them overlap.
 
 | VO file | Length | Starts | Ends | Lands on |
 |---|---|---|---|---|
 | `1_hook.mp3` | 5.4 s | 0:00.5 | 0:05.9 | the drawings photo |
 | `2_idea.mp3` | 11.2 s | 0:07.5 | 0:18.7 | the home screen |
-| `3a_add.mp3` | 11.9 s | 0:20.5 | 0:32.4 | QR appears at 0:21.0, then the phone (clip C) |
-| `3b_send.mp3` | 3.9 s | 0:37.0 | 0:40.9 | "Press send, and…" over the waiting screen; "…Queen Whiskers walks on stage" as she walks in (from 0:38.7) |
-| `4_story.mp3` | 9.9 s | 0:58.6 | 1:08.5 | "Halfway through, the child decides…" ends as the choice appears (1:08.25) |
-| `5_pause.mp3` | 7.1 s | 1:24.0 | 1:31.1 | "Alexa, pause" lands on the **Paused** badge (1:26.35); spills 0.7 s into the dance, which is fine |
-| `6_dance.mp3` | 3.2 s | 1:32.6 | 1:35.8 | "everybody dance!" as they start dancing (1:34.65) |
-| `7a_built.mp3` | 10.7 s | 1:42.2 | 1:52.9 | the diagram |
-| `7b_honest.mp3` | 11.7 s | 1:53.3 | 2:05.0 | the muted story footage |
-| `7c_open.mp3` | 5.9 s | 2:05.2 | 2:11.1 | skeletons, then the walking cat |
-| `8_close.mp3` | 3.9 s | 2:12.0 | 2:15.9 | the end card |
+| `3a_add.mp3` | 11.9 s | 0:22.4 | 0:34.3 | "scans the code on the TV" over the QR (from 0:22.0), then the phone; "If a dot is off, you drag it" with the skeleton beside the phone (0:32.3) |
+| `3b_send.mp3` | 3.9 s | 0:37.1 | 0:41.0 | "Press send, and…" just after Send; "…Queen Whiskers walks on stage" as she arrives (0:39.1) |
+| `4_story.mp3` | 9.9 s | 0:57.0 | 1:06.9 | "Halfway through, the child decides…" ends as the choice cards appear (1:07.1) |
+| `5_pause.mp3` | 7.1 s | 1:19.0 | 1:26.0 | "Alexa, pause" lands on the **Paused** badge (1:21.3) |
+| `6_dance.mp3` | 3.2 s | 1:28.2 | 1:31.4 | "everybody dance!" as they start dancing (1:30.5) |
+| `6b_bedtime.mp3` | 11.1 s | 1:37.5 | 1:48.6 | Home with Bedtime ON and the two chips, then the last line and the lights going down |
+| `7a_built.mp3` | 10.7 s | 1:58.2 | 2:08.9 | the diagram |
+| `7b_honest.mp3` | 11.7 s | 2:09.2 | 2:20.8 | starts on the diagram; "…this demo plays from our hand-written story set" over the muted story footage |
+| `7c_open.mp3` | 5.9 s | 2:21.3 | 2:27.2 | skeletons, then the walking cat |
+| `8_close.mp3` | 3.9 s | 2:27.4 | 2:31.4 | the end card |
 
-### App narration (the sound inside `story_sound.mp4` and `pause_sound.mp4`)
+### App sound (inside `story_sound.mp4`, `pause_sound.mp4` and `bedtime.mp4`)
 
-- **Scene 4a:** full volume from 0:48.5 so the first line ("Down under the sea…", timeline
-  0:50.9–0:58.0) plays clean with the read-along highlight. **Split at 0:58.3 and duck to 15%**
-  until **1:08.6**, then split again and go back to **100%** (the choice screen is silent; the
-  kelp line plays at full volume from 1:13.9).
-- **Scene 4b:** 100%, so "The end!" is heard.
-- **Scene 5:** 100% from 1:22.3 to 1:24.0, then **duck to 35%** to the end of the clip. Keep it
-  audible: the point is that the voice stops dead at the pause (1:26.35) and comes back at
-  1:29.4.
-- **Scene 7b:** muted (0%).
-- `home_add.mp4` and `party.mp4` have no sound. Optional: a quiet "No attribution required"
-  track from the YouTube Audio Library under scenes 2, 3 and 6 at about 10%.
+The TV's own sound is ducked to 20% while any voice-over line plays (35% in scene 5, so the
+pause is heard), and is at 100% in between.
 
-### Captions (Text row)
+- Screen recordings carry no sound, so `record.py` rebuilds it: every Polly line the TV fetches
+  is placed at its fetch time. Lines the TV speaks with **its own** text-to-speech are not
+  fetched, so `record.py` adds Polly stand-ins in the same narrator voice (Ruth) at the measured
+  times: the choice read-out ("What should they do? Explore the shipwreck, or Swim through the
+  kelp?", story src 32.7) and the wind-down's "The end!" and "Goodnight, Queen Whiskers, Professor
+  Noodles, King Bloop and Bolt." (bedtime src 81.4 and 83.8–89.0). In scene 6b the goodnight line
+  comes right after the voice-over ends (1:49.1–1:54.2), so it plays at full volume.
+- **Scene 4:** narration at full volume from 0:48.9 to 0:56.7, ducked under `4_story`, then full
+  volume again for the choice read-out (1:07.5) and the kelp line (from 1:12.8).
+- **Scene 5:** ducked to 35%: the voice stops dead at the pause (1:21.3) and comes back at 1:24.4.
+- **Scene 7b:** muted.
+- `home_add.mp4` and `party.mp4` have no sound.
+
+### Captions
 
 | Timeline | Text |
 |---|---|
-| 0:00.5–0:06.0 | Doodle Theater |
-| 0:25.0–0:37.0 | Phone: no app, just the camera and a QR code |
-| 0:39.0–0:46.0 | Photo to puppet in seconds, animated live on the TV *(say "about 2 seconds / 60 fps" only if you have measured it, e.g. on the Puppet Lab FPS readout)* |
-| 0:59.0–1:08.0 | Polly neural voices · word speech marks · D-pad choices |
-| 1:24.0–1:30.4 | Emulator: "Alexa, pause" sent as a media-session pause command |
-| 1:53.3–2:04.7 | **If still blocked:** Demo stories: hand-written offline set, narrated by Amazon Polly. **If Bedrock works:** delete this caption, or swap in footage of a story the agent wrote. |
+| 0:00.5–0:06.2 | Doodle Theater |
+| 0:24.6–0:37.4 | Phone: no app, just the camera and a QR code |
+| 0:31.9–0:37.4 | Joint dots found by doodle-rig. One off? Drag it. (beside the skeleton) |
+| 0:39.4–0:46.6 | Photo to puppet in seconds, animated live on the TV |
+| 0:57.4–1:06.7 | Polly neural voices · word speech marks · picture choices on the D-pad |
+| 1:19.0–1:25.7 | Emulator: "Alexa, pause" sent as a media-session pause command |
+| 1:37.7–1:48.5 | Bedtime mode · goodnight wind-down · stories-tonight limit |
+| 2:12.4–2:20.8 | **If still blocked:** Demo stories: hand-written offline set, narrated by Amazon Polly. **If Bedrock works:** delete this caption, or swap in footage of a story the agent wrote. |
 
 ### If Bedrock starts working before you record
 
 Re-generate `7b_honest.mp3` with the "If Bedrock works" line (edit `make_voiceover.py`, re-run),
-check its new length, and stretch or shorten scene 7b to match by changing the speed (0.8× gives
-11.4 s, 0.9× gives 10.1 s, 1.0× gives 9.1 s). Everything after it shifts by the difference.
+check its new length, and stretch or shorten scene 7b to match (`clip(story, 42.5, 51.5)` in
+`build_video.py`; the story footage is clean up to src 52.9, where the wind-down starts).
+Everything after it shifts by the difference.
 
 ### Before you export, check
 
-- Scene 4a around 1:07–1:08, and scene 6 from 1:34 on: King Bloop raises his arms there. In
-  these wide shots the dark smear is small, but look at it full screen. If it bothers you, end
-  scene 6 at src 27.0 instead of 29.9 (saves 2.9 s).
+- Scene 7b around 2:12–2:14: King Bloop raises an arm there and the dark smear shows a little. It
+  is a wide shot, but look at it full screen.
+- Scene 6b: a bedtime story already ends its last line with "The end!", and the TV says "The
+  end!" again as the lights go down. Both are heard here, under the voice-over.
 - Clip C: no notifications, no other tabs, no personal details on screen.
-- Total under 3:00 (this plan: 2:18.5, plus or minus clip C).
+- Total under 3:00 (this render: 2:35.3).

@@ -5,6 +5,7 @@ usage:
   python build_video.py --phone-in 2 --phone-out 26   use only that part of clips/phone.mp4
   python build_video.py --check [--sheet x.jpg]  report length and loudness of the render
                                                  (and write a contact sheet, a frame every 8 s)
+  python build_video.py --preview                write the 720p preview next to the render
 
 needs: ffmpeg + ffprobe on PATH. Python stdlib only.
 
@@ -24,16 +25,22 @@ How it is put together
 - The phone take shows no joint dots, so Queen Whiskers' skeleton from rig_skeletons.png is
   laid beside the phone for "If a dot is off, you drag it".
 
-Deliberate departures from the cut list, to keep known glitches off screen:
-- Scene 4b: the story's last scene has two name labels on top of each other ("Queen Whis" under
-  "Professor Noodles"), so the "The End" screen is shown cropped to the title and buttons, and
-  "The end!" is heard over the last moment of the kelp scene just before the cut.
-- Scene 7b: the same overlap starts at story src 44.8, so the footage under "this demo plays
-  from our hand-written story set" is the opening of the space story (pause_sound 18.4-21.5)
-  and the start of the sea story's turtle line (42.6-44.7), slowed to 0.65x, instead of story
-  41.8-50.9. The diagram stays up for the first part of that line to cover the shorter footage.
-- The End screen is fully up at story src 53.0 (the cut list says 52.1, which is when "The
-  end!" finishes being spoken).
+Clips (re-recorded 2026-10-21 with the new TV UI; the first takes are kept as clips/*_v1.mp4):
+- home_add.mp4: Home, focus over the stars (Selected tag) and themes, then Add a star, the QR, and
+  Queen Whiskers arriving. story_sound.mp4: Under the Sea in daytime, through the picture-choice
+  cards to the bedtime wind-down and the Goodnight card. bedtime.mp4: Home with Bedtime ON, then a
+  bedtime Space Adventure to its wind-down. pause_sound.mp4, party.mp4: as before.
+- The wind-down's "The end!" / "Goodnight, <names>." are the TV's own text-to-speech, so record.py
+  lays Polly stand-ins (same narrator voice) into story_sound.mp4 and bedtime.mp4 at the measured
+  times.
+
+Deliberate departures from the cut list:
+- Scene 4 ends on the kelp scene; the wind-down and Goodnight card are shown once, in the bedtime
+  scene (6b), where the dimming reads best.
+- Scene 6b (bedtime) punches in on the top-right of Home (bedtime.mp4 src 5.0-10.4, a 1280x720
+  crop) so the "Bedtime ON" and "Stories tonight" chips are readable while focus visits them.
+- Bedtime stories end their last line with "The end!" and the TV then says "The end!" again as
+  the lights go down; both are heard (under the voice-over) in scene 6b.
 """
 from __future__ import annotations
 
@@ -49,6 +56,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CLIPS, IMAGES, VO_DIR = HERE / "clips", HERE / "images", HERE / "voiceover"
 OUT = HERE / "final" / "doodle-theater-demo.mp4"
+PREVIEW = HERE / "final" / "doodle-theater-demo-preview.mp4"
 FONT = HERE.parent / "tv" / "app" / "src" / "main" / "res" / "font" / "baloo2.ttf"
 PHONE = CLIPS / "phone.mp4"
 
@@ -60,12 +68,14 @@ DUCK_PAUSE = 0.35           # scene 5: keep the pause audible (cut list says 35%
 MASTER_DB = 6.0             # Polly MP3s sit around -25 dB mean; lift the whole mix a little
 PHONE_PLANNED = 12.0        # placeholder length when clip C is missing
 PHONE_MAX = 30.0            # with --phone-in/--phone-out: longer phone clips are sped up to fit this
-# clips/phone.mp4 (22.4 s): 0-1.5 about:blank; "Photograph the drawing" to ~7.2; "Cutting out" spinner
-# ~7.5; cat preview ~10; name field focused ~12.5; idle (keyboard closed) ~13-17.3; "Queen Whiskers"
-# typed 17.5-20.5; Send ~21.9; "Queen Whiskers is on the TV now!" ~22.2.
-PHONE_RANGES = [(5.0, 13.0, 1.0), (13.0, 17.3, 4.0), (17.3, None, 1.0)]  # (in, out, speed)
+# clips/phone.mp4 (27.4 s, 2026-10-21 take): about:blank until 4.4; step bar on 1 "Photo",
+# "Photograph the drawing" tapped 6.8; "Cutting out" 7.8, "Finding elbows and knees" 8.8 (step 2);
+# cat preview 9.25; 9.3-11.7 a stray keyboard (the script's "Fix the joints" tap hit the name field)
+# - skipped; idle on the moving cat 11.9-17.5; "Queen Whiskers" typed 17.9-19.9; Send ~21.0;
+# "Queen Whiskers is on the TV now!" (all three steps ticked) 21.5, static to the end.
+PHONE_RANGES = [(4.3, 9.25, 1.0), (11.9, 17.5, 1.5), (17.5, 22.3, 1.0)]  # (in, out, speed)
 PHONE_CROP_TOP = 182        # status bar (notification icons) + Chrome URL bar
-END_CROP = "860:484:530:0"  # "The End" title + buttons, without the overlapping name labels
+CHIPS_CROP = "1280:720:640:0"  # Home's top-right: the Bedtime and Stories-tonight chips
 
 
 def fr(x: float) -> float:
@@ -338,11 +348,15 @@ def render_scene(idx: int, sc: Scene, tmp: Path) -> Path:
 def build_scenes(tmp: Path, phone_in, phone_out, phone_max) -> tuple[list[Scene], str]:
     home, party = CLIPS / "home_add.mp4", CLIPS / "party.mp4"
     story, pause = CLIPS / "story_sound.mp4", CLIPS / "pause_sound.mp4"
+    bed = CLIPS / "bedtime.mp4"
     ph, L, note = phone_piece(tmp, phone_in, phone_out, phone_max)
     scenes = [
         Scene("1 hook: the drawings", [still(IMAGES / "drawings_photo.webp", 7.5, zoom=(1.0, 1.12))],
               vo=[("1_hook", 0.5)], caps=[Cap("Doodle Theater", 0.5, 6.2, "title")]),
-        Scene("2+3a home screen, Add a star + QR", [clip(home, 0.0, 18.0)],
+        # home_add: focus over the stars ("Selected") 2.5-7, the themes 7.5-11; back to Add a star
+        # 12-18 (sped up 3x); Add a star opens 19.5, QR 20.5.
+        Scene("2+3a home screen, Add a star + QR",
+              [clip(home, 1.5, 12.0), clip(home, 12.0, 18.0, speed=3.0), clip(home, 18.0, 23.0)],
               vo=[("2_idea", 0.5)], xfade=0.5),
         # 3a_add starts 1.8 s before the phone, so "scans the code on the TV" is over the QR,
         # "cuts the character out" over the spinner, and "If a dot is off, you drag it" (VO 9.9 s)
@@ -353,30 +367,35 @@ def build_scenes(tmp: Path, phone_in, phone_out, phone_max) -> tuple[list[Scene]
                         x=L.text_x + 380, y="640")],
               overlays=[(IMAGES / "rig_skeletons.png", 7.7, ph.dur - 0.3, L.text_x - 20, 540, 420,
                          "320:400:0:0")]),
-        # "Press send, and..." over the phone's Send tap; "...Queen Whiskers walks on stage" as she
-        # arrives (home_add src 24.2).
-        Scene("3b Queen Whiskers arrives", [clip(home, 22.5, 32.0)], vo=[("3b_send", -0.3)],
-              caps=[Cap("Photo to puppet in seconds, animated live on the TV", 2.0, 9.0)], xfade=0.3),
-        # 4a + 4b. "The end!" (story src 51.55-52.09) plays over the end of the kelp scene, then a
-        # hard cut to the cropped "The End" screen, so the overlapping labels never show. (The End
-        # screen is fully up at src 53.0, not 52.1 as the cut list says; before that the text bubble
-        # is still on screen and the crop would show a giant slice of it.)
-        Scene("4 tonight's story", [clip(story, 12.5, 42.6), clip(story, 53.05, 56.35, crop=END_CROP)],
-              audio=[(story, 12.5, 41.8), (story, 51.3, 55.4)], vo=[("4_story", 10.1)],
-              caps=[Cap("Polly neural voices · word speech marks · D-pad choices", 10.5, 19.5)]),
-        Scene("5 pause / resume", [clip(pause, 21.5, 29.6)], audio=[(pause, 21.5, 29.6)],
+        # "Press send, and..." then "...Queen Whiskers walks on stage" as "Queen Whiskers has
+        # arrived!" pops up (home_add src 30.4) and she walks in (to ~34), then waves.
+        Scene("3b Queen Whiskers arrives", [clip(home, 28.7, 38.2)], vo=[("3b_send", -0.3)],
+              caps=[Cap("Photo to puppet in seconds, animated live on the TV", 2.0, 9.2)], xfade=0.3),
+        # story_sound: title 12.3, narration from 13.0, "What should they do?" with the picture
+        # cards 32.3, focus moves to "Swim through the kelp" 36.0, kelp scene 38.0.
+        Scene("4 tonight's story", [clip(story, 12.1, 42.5)], audio=[(story, 12.1, 42.5)],
+              vo=[("4_story", 10.1)],
+              caps=[Cap("Polly neural voices · word speech marks · picture choices on the D-pad", 10.5, 19.8)]),
+        # pause_sound: "Look! A little star..." from 23.0, Paused 23.33, resumed 26.42.
+        Scene("5 pause / resume", [clip(pause, 19.3, 28.0)], audio=[(pause, 19.3, 28.0)],
               vo=[("5_pause", 1.7)], duck=DUCK_PAUSE,
-              caps=[Cap('Emulator: "Alexa, pause" sent as a media-session pause command', 1.7, 8.0)]),
-        Scene("6 dance party", [clip(party, 18.5, 29.9)], vo=[("6_dance", 2.2)]),
+              caps=[Cap('Emulator: "Alexa, pause" sent as a media-session pause command', 1.7, 8.4)]),
+        # party: tricks with the spotlight + "Now dancing" tag, everybody dances from ~23.
+        Scene("6 dance party", [clip(party, 18.5, 29.95)], vo=[("6_dance", 2.2)]),
+        # bedtime: Home with Bedtime ON, focus on Bolt (3-5), then a punch-in on the chips while
+        # focus visits "Stories tonight" (5.3-7.5) and "Bedtime ON" (7.8-10.3); then the end of the
+        # bedtime story: "...a big, sleepy yawn. The end!", the wind-down from 81.0 (stars wave,
+        # stage dims, moon), "The end!" 81.4, "Goodnight, Queen Whiskers, ..." 83.8-89.0 (after the
+        # voice-over), the Goodnight card 90.6.
+        Scene("6b bedtime", [clip(bed, 3.0, 5.0), clip(bed, 5.0, 10.4, crop=CHIPS_CROP), clip(bed, 79.3, 93.0)],
+              audio=[(bed, 3.0, 10.4), (bed, 79.3, 93.0)], vo=[("6b_bedtime", 0.4)], xfade=0.3,
+              caps=[Cap("Bedtime mode · goodnight wind-down · stories-tonight limit", 0.6, 11.4)]),
         # 7b_honest starts on the diagram ("Our new AWS account was still waiting...") and the demo
-        # footage comes in for "...so this demo plays from our hand-written story set". Only ~5 s of
-        # clean, unused story footage exists: the sea story's labels overlap from src 44.8 on, and
-        # the space story's from its walk-in until 18.4.
+        # footage comes in for "...so this demo plays from our hand-written story set".
         Scene("7a diagram", [still(IMAGES / "diagram.png", 14.6, zoom=(1.0, 1.06))],
               vo=[("7a_built", 0.4), ("7b_honest", 11.0)], xfade=0.4),
-        Scene("7b demo stories (muted, slowed)", [clip(pause, 18.4, 21.5, speed=0.65),
-                                                  clip(story, 42.6, 44.7, speed=0.65)], xfade=0.3,
-              caps=[Cap("Demo stories: hand-written offline set, narrated by Amazon Polly", 0.3, 7.7)]),
+        Scene("7b demo story (muted)", [clip(story, 42.5, 51.5)], xfade=0.3,
+              caps=[Cap("Demo stories: hand-written offline set, narrated by Amazon Polly", 0.3, 8.7)]),
         Scene("7c rig skeletons", [still(IMAGES / "rig_skeletons.png", 3.6, fit="contain", margin=80)],
               vo=[("7c_open", 0.5)], xfade=0.3),
         Scene("7c cat walk", [gif(IMAGES / "cat_walk.gif", 3.2)], xfade=0.3),
@@ -472,6 +491,14 @@ def build(phone_in=None, phone_out=None, phone_max=PHONE_MAX) -> None:
     print(f"wrote {OUT}  ({total:.2f} s = {int(total // 60)}:{total % 60:04.1f})")
 
 
+def preview() -> None:
+    """A 720p copy of the render for quick sharing (aim: under 25 MB)."""
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(OUT), "-vf", "scale=1280:720:flags=lanczos",
+         "-c:v", "libx264", "-preset", "slow", "-crf", "25", "-pix_fmt", "yuv420p", "-profile:v", "high",
+         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(PREVIEW)])
+    print(f"wrote {PREVIEW}  ({PREVIEW.stat().st_size / 1e6:.1f} MB)")
+
+
 def check(sheet: Path | None) -> None:
     info = probe(OUT)
     if not info:
@@ -503,8 +530,11 @@ if __name__ == "__main__":
                     help=f"longest the phone part may run; longer is sped up (default {PHONE_MAX:g})")
     ap.add_argument("--check", action="store_true", help="only report on the existing render")
     ap.add_argument("--sheet", type=Path, help="with --check: write a contact sheet here")
+    ap.add_argument("--preview", action="store_true", help="only write the 720p preview of the render")
     a = ap.parse_args()
-    if a.check:
+    if a.preview:
+        preview()
+    elif a.check:
         check(a.sheet)
     else:
         build(a.phone_in, a.phone_out, a.phone_max)
