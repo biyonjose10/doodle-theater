@@ -1,8 +1,7 @@
 """Crayon-style stage backdrops, drawn in code so every story has scenery with no AI at all.
 
-Run `python -m doodle_theater.backdrops` to (re)draw them into static/backdrops/. When AWS is
-configured, `scripts/make_backdrops_nova.py` can replace them with Amazon Nova Canvas art; the
-filenames stay the same, so the TV never knows the difference.
+Run `python -m doodle_theater.backdrops` to (re)draw them into static/backdrops/. Hand-drawn
+crayon suits the children's own drawings better than generated art would.
 """
 from __future__ import annotations
 

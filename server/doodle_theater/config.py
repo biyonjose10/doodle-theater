@@ -13,9 +13,12 @@ PORT = int(os.environ.get("DT_PORT", "8787"))
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 # Vision (joints + one-line description) and story writing. Any Bedrock Converse model id or
 # inference profile works; DT_*_MODEL=off disables that feature (offline fallbacks take over).
-VISION_MODEL = os.environ.get("DT_VISION_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
-STORY_MODEL = os.environ.get("DT_STORY_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+# Amazon Nova by default: first-party, so it also runs on AWS Free plan accounts.
+VISION_MODEL = os.environ.get("DT_VISION_MODEL", "us.amazon.nova-2-lite-v1:0")
+STORY_MODEL = os.environ.get("DT_STORY_MODEL", "us.amazon.nova-2-lite-v1:0")
+# Empty = use the guardrail named GUARDRAIL_NAME, which scripts/make_guardrail.py creates.
 GUARDRAIL_ID = os.environ.get("DT_GUARDRAIL_ID", "")
+GUARDRAIL_NAME = "doodle-theater-kids"
 GUARDRAIL_VERSION = os.environ.get("DT_GUARDRAIL_VERSION", "DRAFT")
 NARRATOR_VOICE = os.environ.get("DT_NARRATOR_VOICE", "Ruth")
 

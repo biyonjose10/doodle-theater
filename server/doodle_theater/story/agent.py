@@ -7,10 +7,11 @@ line) before the child ever sees them. Bedrock Guardrails screen what goes in an
 """
 from __future__ import annotations
 
+import functools
 import json
 import logging
 
-from ..config import AWS_REGION, GUARDRAIL_ID, GUARDRAIL_VERSION, STORY_MODEL
+from ..config import AWS_REGION, GUARDRAIL_ID, GUARDRAIL_VERSION, GUARDRAIL_NAME, STORY_MODEL
 from .schema import BACKDROPS, MOVES, STAGE_DIRECTIONS, THEME_TITLES, validate
 
 log = logging.getLogger(__name__)
@@ -80,8 +81,8 @@ def writer(theme: str, cast: list[dict]) -> dict | None:
         return "ACCEPTED. The story is ready."
 
     kwargs = {}
-    if GUARDRAIL_ID:
-        kwargs.update(guardrail_id=GUARDRAIL_ID, guardrail_version=GUARDRAIL_VERSION)
+    if guardrail := guardrail_id():
+        kwargs.update(guardrail_id=guardrail, guardrail_version=GUARDRAIL_VERSION)
     model = BedrockModel(model_id=STORY_MODEL, region_name=AWS_REGION, temperature=0.8, max_tokens=4000, **kwargs)
     agent = Agent(model=model, tools=[list_backdrops, list_moves, submit_episode],
                   system_prompt=SYSTEM, callback_handler=None)
@@ -91,6 +92,20 @@ def writer(theme: str, cast: list[dict]) -> dict | None:
           f"Moves: {', '.join(MOVES)}.\nFormat example (ids are placeholders):\n{json.dumps(EXAMPLE)}\n\n"
           "Write tonight's play and submit it.")
     return accepted.get("episode")
+
+
+@functools.cache
+def guardrail_id() -> str:
+    """DT_GUARDRAIL_ID, else the guardrail scripts/make_guardrail.py created in this account."""
+    if GUARDRAIL_ID:
+        return GUARDRAIL_ID
+    try:
+        import boto3
+        found = boto3.client("bedrock", region_name=AWS_REGION).list_guardrails()["guardrails"]
+    except Exception as e:
+        log.warning("could not look up the guardrail, stories run without it: %s", e)
+        return ""
+    return next((g["id"] for g in found if g["name"] == GUARDRAIL_NAME), "")
 
 
 def available() -> bool:
