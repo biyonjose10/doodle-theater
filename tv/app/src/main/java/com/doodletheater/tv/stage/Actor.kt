@@ -3,6 +3,7 @@ package com.doodletheater.tv.stage
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Shader
 import com.doodletheater.tv.rig.Motion
 import com.doodletheater.tv.rig.PoseSample
@@ -85,19 +86,26 @@ class Actor(val rig: Rig, private val motions: Map<String, Motion>) {
         if (targetX == null && now >= stopAt) play("idle", now)
     }
 
-    fun draw(canvas: Canvas, stageW: Float, stageH: Float, now: Double, labelPaint: Paint? = null) {
+    /** Where the paper name tag above the head would sit, or null when there is no label. */
+    fun labelBox(stageW: Float, stageH: Float, labelPaint: Paint): RectF? {
+        if (label == null) return null
+        val base = feetY * stageH - heightFraction * stageH - labelPaint.textSize * 0.5f
+        val w = labelPaint.measureText(label) / 2 + labelPaint.textSize * 0.5f
+        val h = labelPaint.textSize
+        return RectF(x * stageW - w, base - h, x * stageW + w, base + h * 0.35f)
+    }
+
+    /** The name tag in [box] (from [labelBox], possibly nudged so it clears its neighbours). */
+    fun drawLabel(canvas: Canvas, box: RectF, labelPaint: Paint) {
+        val text = label ?: return
+        val h = labelPaint.textSize
+        canvas.drawRoundRect(box, h * 0.6f, h * 0.6f, tagPaint)
+        canvas.drawText(text, box.centerX(), box.bottom - h * 0.35f, labelPaint)
+    }
+
+    fun draw(canvas: Canvas, stageW: Float, stageH: Float, now: Double) {
         val verts = skinner.pose(sample.sample(motion, now - started))
         val s = heightFraction * stageH / rig.meshHeight
-        label?.let { text ->
-            if (labelPaint != null) {
-                // A paper name tag above the head, readable on any backdrop.
-                val base = feetY * stageH - heightFraction * stageH - labelPaint.textSize * 0.5f
-                val w = labelPaint.measureText(text) / 2 + labelPaint.textSize * 0.5f
-                val h = labelPaint.textSize
-                canvas.drawRoundRect(x * stageW - w, base - h, x * stageW + w, base + h * 0.35f, h * 0.6f, h * 0.6f, tagPaint)
-                canvas.drawText(text, x * stageW, base, labelPaint)
-            }
-        }
         canvas.save()
         canvas.translate(x * stageW - rig.rest[0].toFloat() * s, feetY * stageH - rig.groundY * s)
         canvas.scale(s, s)

@@ -1,6 +1,7 @@
 package com.doodletheater.tv.stage
 
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,7 +85,21 @@ fun Stage(
         drawIntoCanvas { c ->
             for (a in actors) {
                 a.update(now)
-                a.draw(c.nativeCanvas, size.width, size.height, now, labelPaint)
+                a.draw(c.nativeCanvas, size.width, size.height, now)
+            }
+            // Name tags go on top of every puppet, stacked upwards wherever two would overlap.
+            if (labelPaint != null) {
+                val gap = labelPaint.textSize * 0.15f
+                val placed = ArrayList<RectF>()
+                for ((a, box) in actors.mapNotNull { a -> a.labelBox(size.width, size.height, labelPaint)?.let { a to it } }
+                    .sortedBy { it.second.left }) {
+                    while (true) {
+                        val hit = placed.firstOrNull { RectF.intersects(it, box) } ?: break
+                        box.offset(0f, hit.top - gap - box.bottom)
+                    }
+                    placed.add(box)
+                    a.drawLabel(c.nativeCanvas, box, labelPaint)
+                }
             }
             if (showFps) c.nativeCanvas.drawText("${fps.tick(f)} fps  ${actors.size} puppets", 24f, 44f, hud)
         }
