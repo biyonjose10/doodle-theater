@@ -32,7 +32,7 @@ renders with desktop OpenGL. doodlerig keeps the idea and drops the weight:
 ## Install
 
 ```bash
-pip install git+https://github.com/biyonjose10/doodle-rig
+pip install "git+https://github.com/biyonjose10/doodle-theater#subdirectory=rig"
 ```
 
 ## Use

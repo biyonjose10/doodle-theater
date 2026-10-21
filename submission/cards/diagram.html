@@ -1,0 +1,57 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Baloo; src: url("../../tv/app/src/main/res/font/baloo2.ttf"); }
+:root { --ink:#2b2a33; --paper:#fbf3e2; --orange:#d9533a; --blue:#5a73d6; --green:#2f7d4f; --purple:#8a4aa0; --sand:#ead6ad; }
+* { box-sizing: border-box; margin: 0; }
+body { width:1920px; height:1080px; background: radial-gradient(ellipse at top, #fff9ec, var(--paper) 70%); font-family: Baloo, sans-serif; color: var(--ink); position: relative; overflow: hidden; }
+h1 { position:absolute; top:56px; left:0; right:0; text-align:center; font-size:64px; font-weight:800; }
+.box { position:absolute; background:#fff; border:5px solid var(--ink); border-radius:34px; padding:28px 34px; box-shadow: 8px 10px 0 rgba(43,42,51,.15); }
+.box h2 { font-size:40px; line-height:1.1; margin-bottom:10px; }
+.box p { font-size:27px; line-height:1.3; color:#4a4855; }
+.tag { display:inline-block; font-size:22px; font-weight:700; color:#fff; border-radius:999px; padding:4px 16px; margin:8px 8px 0 0; }
+.arrow { position:absolute; height:10px; background: var(--ink); border-radius:6px; }
+.arrow::after { content:""; position:absolute; right:-14px; top:-13px; border-left:26px solid var(--ink); border-top:18px solid transparent; border-bottom:18px solid transparent; }
+.label { position:absolute; font-size:26px; font-weight:700; text-align:center; }
+.v { position:absolute; width:10px; background: var(--ink); border-radius:6px; }
+.v.down::after { content:""; position:absolute; bottom:-14px; left:-13px; border-top:26px solid var(--ink); border-left:18px solid transparent; border-right:18px solid transparent; }
+.v.up::before { content:""; position:absolute; top:-14px; left:-13px; border-bottom:26px solid var(--ink); border-left:18px solid transparent; border-right:18px solid transparent; }
+.note { position:absolute; bottom:44px; left:0; right:0; text-align:center; font-size:28px; color:#5d5a68; }
+</style></head>
+<body>
+<h1>How Doodle Theater works</h1>
+
+<div class="box" style="left:80px; top:250px; width:420px; height:330px; border-color:var(--orange)">
+  <h2>📱 Parent's phone</h2>
+  <p>Scan the QR on the TV. Snap the drawing, drag any joint dot, name the star.</p>
+  <span class="tag" style="background:var(--orange)">no app to install</span>
+</div>
+
+<div class="box" style="left:740px; top:200px; width:450px; height:440px">
+  <h2>🧩 Doodle Theater server</h2>
+  <p><b>doodle-rig</b> (open source, MIT): cut out → joints → mesh → skin weights.</p>
+  <p style="margin-top:10px">Story agent, built with <b>Strands Agents</b>, checks every episode with the TV's own validator.</p>
+</div>
+
+<div class="box" style="left:1420px; top:250px; width:420px; height:330px; border-color:var(--blue)">
+  <h2>📺 Fire TV app</h2>
+  <p>Kotlin + Compose for TV. Puppets drawn live with drawVertices at 60 fps. D-pad choices, "Alexa, pause".</p>
+</div>
+
+<div class="arrow" style="left:510px; top:410px; width:220px"></div>
+<div class="label" style="left:505px; top:350px; width:230px">photo</div>
+<div class="arrow" style="left:1190px; top:410px; width:210px"></div>
+<div class="label" style="left:1185px; top:350px; width:220px">rig + story</div>
+
+<div class="v down" style="left:860px; top:648px; height:88px"></div>
+<div class="v up" style="left:1060px; top:660px; height:84px"></div>
+
+<div class="box" style="left:360px; top:760px; width:1200px; height:200px; border-color:var(--green); background:#f4fbf6">
+  <h2>☁️ AWS</h2>
+  <span class="tag" style="background:var(--purple)">Amazon Bedrock · Nova 2 Lite: joints, description, stories</span>
+  <span class="tag" style="background:var(--green)">Bedrock Guardrails: bedtime-safe</span>
+  <span class="tag" style="background:var(--blue)">Amazon Polly: neural voices + word timings</span>
+</div>
+
+<div class="note">No network? The show goes on: hand-written stories, crayon backdrops drawn in code, the TV's own voice.</div>
+</body></html>

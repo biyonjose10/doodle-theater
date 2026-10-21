@@ -27,7 +27,7 @@ flowchart LR
 1. **Pair.** On the TV, *Add a star* shows a four-letter code and a QR. The phone opens
    `http://<laptop>:8787/p/<code>`.
 2. **Rig.** The photo is cut out and turned into a puppet (texture, triangle mesh, 16-joint
-   skeleton, skin weights) by [doodlerig](https://github.com/biyonjose10/doodle-rig). A Bedrock
+   skeleton, skin weights) by [doodlerig](rig/). A Bedrock
    vision model proposes where the joints are and writes a one-line description. Every proposed
    point is checked against the cut-out mask, and anything implausible falls back to doodlerig's
    silhouette guess. The parent sees the puppet move on the phone, can drag any joint, names it,
@@ -79,7 +79,7 @@ running the server over the local network.
 |---|---|
 | TV app (`tv/`) | Kotlin 2.3, Jetpack Compose + `androidx.tv:tv-material` 1.0.1, AGP 8.13, Gradle 8.13, JDK 17, `minSdk 25` (Fire OS 6+), `compileSdk`/`targetSdk 36` |
 | Server (`server/`) | Python 3.13, FastAPI, Uvicorn, segno (QR), Pillow, NumPy, OpenCV (headless) |
-| Puppets | [doodlerig](https://github.com/biyonjose10/doodle-rig) (Python rigging library + `doodlerig.js` WebGL player on the phone page) |
+| Puppets | [doodlerig](rig/) (Python rigging library + `doodlerig.js` WebGL player on the phone page) |
 | AI | Amazon Bedrock (Converse API, Amazon Nova 2 Lite), Strands Agents, Bedrock Guardrails, Amazon Polly |
 
 ## Setup and run
@@ -93,7 +93,7 @@ cd server
 python -m venv .venv
 # Windows: .venv\Scripts\activate      macOS/Linux: source .venv/bin/activate
 pip install fastapi uvicorn python-multipart python-dotenv segno pillow numpy opencv-python-headless boto3 strands-agents pytest
-pip install git+https://github.com/biyonjose10/doodle-rig
+pip install -e ../rig
 ```
 
 Run it on all interfaces so the phone can reach it:
@@ -207,12 +207,15 @@ tv/app/src/main/java/com/doodletheater/tv/
                          rig/ (pose maths), stage/ (drawVertices renderer), story/ (player, narrator),
                          ui/ (Home, AddStar, DanceParty, PuppetLab), net/ServerApi.kt
 docs/                    FRICTION.md (logged while building), FEEDBACK.md (product feedback)
+rig/                     doodlerig, the open-source photo-to-puppet rigger (MIT, own README and tests)
+submission/              demo video clips, voice-over, diagram, end card, Devpost draft, scripts
 ```
 
 ## Related
 
-- [doodlerig](https://github.com/biyonjose10/doodle-rig): the open-source library that turns a
-  photo of a drawing into a rigged puppet. MIT licensed, usable on its own.
+- [doodlerig](rig/): the open-source library that turns a photo of a drawing into a rigged
+  puppet. MIT licensed and usable on its own:
+  `pip install "git+https://github.com/biyonjose10/doodle-theater#subdirectory=rig"`.
 
 ## Licence
 
