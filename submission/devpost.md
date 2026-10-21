@@ -50,6 +50,11 @@ family already gathers around at bedtime, with nothing to install and no account
    `MediaSession`, so transport commands such as "Alexa, pause" can reach it (tested on the
    emulator with a media-session pause command).
 6. **Dance Party.** Every star on stage at once, and everybody dances.
+7. **Made for bedtime.** From 7 PM (or with the 🌙 chip) the screen turns warm and dim, Polly
+   narrates slower and softer, and stories avoid scary or running moves. Every story ends with a
+   wind-down: the stage dims to night and the narrator says goodnight to each star by name. A
+   parent can cap "stories tonight" at 1, 2 or 3. We pitch this as a calmer routine, not a sleep aid.
+8. **Picture choices.** Each option has a picture and a LEFT/RIGHT badge, so pre-readers can choose.
 
 Drawings, rigs and episodes are stored only on the laptop running the server.
 

@@ -29,7 +29,9 @@ LINES = {
     "7b_honest": "Our new AWS account was still waiting for Bedrock access during the build, so this demo plays "
                  "from our hand-written story set. It's the same offline fallback that keeps the show going when the network drops.",
     "7c_open": "The rigger is open source, under the M I T licence, and we logged every snag we hit along the way.",
-    "8_close": "Doodle Theater. Every drawing gets its moment on stage.",
+    "6b_bedtime": "After seven, Bedtime mode turns the screen warm and dim, the narrator slows down, and every "
+                  "story ends by saying goodnight to each star. A parent can even set how many stories are allowed tonight.",
+    "8_close":"Doodle Theater. Every drawing gets its moment on stage.",
 }
 
 

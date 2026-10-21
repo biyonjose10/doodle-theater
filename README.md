@@ -44,14 +44,26 @@ flowchart LR
 
 - **Live puppets from a photo:** any drawing with arms and legs, rigged in seconds, animated at
   the TV's frame rate (walk, run, jump, wave, dance, cheer, spin, scared, idle).
-- **Phone as the only input device for parents:** QR pairing, no install, joint fixing by drag.
+- **Phone as the only input device for parents:** QR pairing, no install, joint fixing by drag
+  (dots are lettered R/L, not just coloured), a 1-2-3 step bar, light and dark mode.
 - **Bedtime stories, steered with the remote:** six themes (Space, Jungle, Under the Sea, Dragon
   Castle, Snowy Mountain, Dinosaur Valley), one choice halfway through, two happy endings.
 - **Read-along:** the spoken word is highlighted; stage directions fire on the word they belong
   to ("jumped" makes the puppet jump).
 - **Remote and voice friendly:** ◀ ▶ picks a star, OK makes it jump, ⏯ pauses. The story
   player owns a `MediaSession`, so Fire TV transport commands such as "Alexa, pause" reach it.
+- **Picture choices:** each option carries a picture (🌙 "Fly to the Moon" / ☄️ "Chase the comet")
+  and a LEFT/RIGHT badge, so children who can't read yet can still choose.
 - **Dance Party:** every star on stage at once; OK does a trick, ⏯ makes everybody dance.
+- **Bedtime mode:** on automatically from 19:00 to 06:00 (TV clock) or with the 🌙 chip on Home.
+  The screen gets a warm, dimmed wash; Polly narrates about 10% slower and softer (SSML prosody,
+  word timings mapped back to the plain text); stories avoid "scared" and "run" moves and end
+  with a sleepy line. It is meant to make the evening calmer, not as a sleep aid.
+- **Goodnight wind-down:** at the end of every story the stars wave and settle, the stage dims to
+  night with a moon and stars, the narrator says goodnight to each star by name, and a Goodnight
+  card replaces the usual "play again" prompt as the first thing on screen.
+- **Stories tonight:** a parent can cap stories per night (no limit / 1 / 2 / 3, resets at
+  06:00). At the cap, story cards lock and the Goodnight card offers Home only.
 - **Privacy:** drawings, rigs and episodes are stored only on the laptop running the server
   (with AWS on, the cut-out image is sent to Bedrock for the joint step). `DELETE /api/cast`
   removes every drawing, `DELETE /api/cast/{id}` one.
