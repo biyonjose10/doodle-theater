@@ -14,8 +14,9 @@ What is now verified live on our AWS account:
   `ValidationException: Operation not allowed`, and still did after the "account being verified"
   stage ended. We filed a support case in the "Bedrock Allowlisting" category.
 
-So the Bedrock vision step and the Strands story agent are written, wired and covered by fallback
-tests, but have not yet run against a live model. Rigs and story text still come from the offline
+So the Bedrock vision step and the Strands story agent are written and wired (the story agent's
+fallbacks are covered by tests; the vision step falls back to the silhouette heuristic on any
+error), but have not yet run against a live Bedrock model. Rigs and story text still come from the offline
 path. The Bedrock and Strands points below come from building against the APIs and docs.
 
 ---

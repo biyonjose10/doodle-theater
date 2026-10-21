@@ -136,3 +136,25 @@ Logged while we built it, not reconstructed afterwards. Severity: **Blocker** (n
   kept working; the live test waited for verification.
 - **Suggestion:** Show "account verification in progress" with an estimate on the console home and
   Bedrock pages, not only in the error from the first invoke.
+
+### 11. Bedrock invocation blocked with "Operation not allowed" after verification
+- **Task:** First live Nova `Converse` call after signup, once the verification wait in entry 10
+  was over.
+- **Steps:** Called `Converse` on `amazon.nova-lite-v1:0`, `amazon.nova-micro-v1:0` and
+  `us.amazon.nova-2-lite-v1:0` in us-east-1, then retried through the afternoon.
+- **Expected:** The call works once verification passes, as the earlier error ("less than 2
+  hours") implied.
+- **Actual:** Every `Converse` call returned `ValidationException: Operation not allowed`, still
+  at about 17:30 IST the same day. On the same account and credentials, `ListFoundationModels`,
+  `CreateGuardrail` and Polly all worked. The error does not say why the call is refused or what
+  to do. AWS Support has a category *Account and billing → Account Activation → Bedrock
+  Allowlisting*, so this is a known gate. Opening a case first goes through a generative-AI
+  troubleshooting assistant, which answered that it was unable to offer a recommendation before
+  the case form appeared. A case was filed on 21 October at about 18:20 IST.
+- **Severity:** High on a deadline. The AI story path cannot be shown live.
+- **Workaround:** The app falls back to the hand-written stories, still narrated live by Polly. A
+  local-model path for the same Strands agent (Ollama, `DT_STORY_MODEL=ollama:qwen3:8b`) is being
+  added so the agent loop can be demonstrated.
+- **Suggestion:** Name the gate in the error, for example "Bedrock access for this account
+  requires allowlisting; open a case in Account Activation → Bedrock Allowlisting", and show the
+  same notice on the Bedrock console before the first call.
