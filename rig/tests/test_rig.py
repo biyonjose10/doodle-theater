@@ -184,3 +184,39 @@ def test_full_phone_photos_find_one_character(photo):
     assert 0.1 < frac < 0.9
     n, _ = cv2.connectedComponents((mask > 0).astype(np.uint8))
     assert n == 2  # background + exactly one character
+
+def test_raised_arm_leaves_a_fat_body_flank_behind():
+    """A blobby body: the flank under each arm must stay with the torso when the arms go up.
+
+    It used to get partial upper-arm weight and stretch into a dark 'wing' in wave/cheer.
+    """
+    mask = np.zeros((420, 400), np.uint8)
+    cv2.ellipse(mask, (200, 240), (125, 110), 0, 0, 360, 255, -1)            # fat body
+    cv2.circle(mask, (200, 110), 55, 255, -1)                                # head
+    cv2.line(mask, (120, 165), (25, 115), 255, 24)                           # arms
+    cv2.line(mask, (280, 165), (375, 115), 255, 24)
+    cv2.line(mask, (150, 330), (115, 405), 255, 28)                          # legs
+    cv2.line(mask, (250, 330), (285, 405), 255, 28)
+    joints = heuristic_joints(mask)
+    v, t = build_mesh(mask)
+    idx, w = compute_weights(v, t, joints)
+
+    # The flanks: the body's outer thirds, well below the shoulders.
+    sy = max(joints["right_shoulder"][1], joints["left_shoulder"][1])
+    flank = (np.abs(v[:, 0] - 200) > 80) & (v[:, 1] > sy + 30) & (v[:, 1] < 300)
+    assert flank.sum() > 20
+    arm = [NAMES.index(n) for n in ("right_shoulder", "right_elbow", "left_shoulder", "left_elbow")]
+    arm_w = (w * np.isin(idx, arm)).sum(axis=1)
+    assert arm_w[flank].max() < 0.15, arm_w[flank].max()          # was up to 1.0
+
+    # Arms up (cheer's peak): compare every vertex with where the torso alone would carry it.
+    angles, root = sample("cheer", 0.0)
+    rest = np.array([joints[n] for n in NAMES])
+    mats = skin_matrices(rest, angles, root, float(v[:, 1].max()), float(np.ptp(v[:, 1])))
+    posed = skin(v, idx, w, mats)
+    torso = NAMES.index("torso")
+    with_torso = skin(v, np.full_like(idx, torso), np.tile([1.0, 0.0], (len(v), 1)), mats)
+    drift = np.linalg.norm(posed - with_torso, axis=1)
+    hands = [int(np.argmin(np.linalg.norm(v - np.array(joints[h]), axis=1))) for h in ("right_hand", "left_hand")]
+    assert drift[hands].min() > 60                                           # the arms really do go up
+    assert drift[flank].max() < 0.1 * drift[hands].min(), (drift[flank].max(), drift[hands].min())

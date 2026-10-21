@@ -42,7 +42,11 @@ def compute_weights(vertices: np.ndarray, triangles: np.ndarray, joints: Joints,
     """Return (indices int32 Nx2, weights float32 Nx2), indices into the skeleton's joints."""
     v = vertices.astype(np.float64)
     n = len(v)
-    e = np.vstack([triangles[:, [0, 1]], triangles[:, [1, 2]], triangles[:, [2, 0]]])
+    # Each edge once: an interior edge belongs to two triangles, and the sparse matrix would
+    # SUM the duplicates, making the interior cost twice the outline and bending every
+    # geodesic out to the rim. Edges used by only one triangle form the outline.
+    e, count = np.unique(np.sort(np.vstack([triangles[:, [0, 1]], triangles[:, [1, 2]], triangles[:, [2, 0]]]),
+                                 axis=1), axis=0, return_counts=True)
     lengths = np.linalg.norm(v[e[:, 0]] - v[e[:, 1]], axis=1)
     graph = coo_matrix((np.concatenate([lengths, lengths]),
                         (np.concatenate([e[:, 0], e[:, 1]]), np.concatenate([e[:, 1], e[:, 0]]))),
@@ -50,6 +54,8 @@ def compute_weights(vertices: np.ndarray, triangles: np.ndarray, joints: Joints,
     tree = cKDTree(v)
     size = float(np.ptp(v, axis=0).max())
     falloff = falloff or 0.05 * size
+
+    rim = cKDTree(v[np.unique(e[count == 1])])
 
     bl = bones(joints)
     dist = np.empty((n, len(bl)))
@@ -62,7 +68,13 @@ def compute_weights(vertices: np.ndarray, triangles: np.ndarray, joints: Joints,
         # distance for islands the mesh does not connect.
         straight = _point_segment_dist(v, a, b)
         geo = np.where(np.isfinite(geo), geo + _point_segment_dist(v[seeds], a, b).min(), np.inf)
-        dist[:, k] = np.where(np.isfinite(geo), np.maximum(geo, straight), straight * 3 + size)
+        d = np.where(np.isfinite(geo), np.maximum(geo, straight), straight * 3 + size)
+        # Treat the bone as a capsule as thick as the drawing around it and measure to its
+        # surface. A stick skeleton says nothing about width: on a fat body the flank under an
+        # arm is as near the thin upper-arm bone as the torso bone (both reach it through the
+        # shoulder), so it got dragged up with the arm. Measured to the surfaces, the fat torso
+        # capsule is clearly nearer and the flank stays put.
+        dist[:, k] = d - np.median(rim.query(samples)[0])
 
     # Collapse bones to their driver joint (several bones can share one, e.g. the torso).
     drivers = sorted({d for d, _, _ in bl})
