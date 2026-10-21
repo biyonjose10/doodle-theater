@@ -78,7 +78,7 @@ PHONE_CROP_TOP = 182        # status bar (notification icons) + Chrome URL bar
 # clips/phone_fix.mp4 (record_fix.py, 2026-10-22): the picker grid 2.5, Queen Whiskers picked 4.5;
 # the pig with only its outline 15.2; brush opened 20, body painted back 22-28, Done 29, rebuilt 30.
 PHONE_FIX = CLIPS / "phone_fix.mp4"
-FIX_RANGES = [(2.3, 6.6, 1.0), (15.0, 17.2, 1.0), (19.8, 28.4, 1.6), (29.6, 33.4, 1.0)]
+FIX_RANGES = [(2.3, 6.6, 1.0), (15.0, 17.2, 1.0), (20.4, 28.4, 3.0), (29.6, 32.8, 1.0)]
 CHIPS_CROP = "1280:720:640:0"  # Home's top-right: the Bedtime and Stories-tonight chips
 
 
