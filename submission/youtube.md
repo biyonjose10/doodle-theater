@@ -1,7 +1,7 @@
 # YouTube upload
 
 **File:** `submission/final/doodle-theater-demo.mp4` · **Thumbnail:** `submission/images/thumbnail.png`
-**Visibility:** Public (or Unlisted) · **Audience:** "No, it's not made for kids". It's a demo for
+**Visibility:** **Public** (the rules say "publicly visible"; Unlisted is a risk) · **Audience:** "No, it's not made for kids". It's a demo for
 judges and parents, and "made for kids" turns off comments and other features.
 **Category:** Science & Technology
 
