@@ -23,6 +23,10 @@ GUARDRAIL_ID = os.environ.get("DT_GUARDRAIL_ID", "")
 GUARDRAIL_NAME = "doodle-theater-kids"
 GUARDRAIL_VERSION = os.environ.get("DT_GUARDRAIL_VERSION", "DRAFT")
 NARRATOR_VOICE = os.environ.get("DT_NARRATOR_VOICE", "Ruth")
+# Bedtime mode (calmer stories, slower and softer narration) when a story request doesn't say:
+# from BEDTIME_START o'clock until BEDTIME_END o'clock, server local time (the window may wrap midnight).
+BEDTIME_START = int(os.environ.get("DT_BEDTIME_START", "19"))
+BEDTIME_END = int(os.environ.get("DT_BEDTIME_END", "6"))
 
 
 def lan_ip() -> str:

@@ -2,8 +2,19 @@ package com.doodletheater.tv.ui
 
 import android.content.Context
 import android.graphics.Paint
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +38,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,10 +71,11 @@ fun labelPaint(context: Context, size: Float = 40f) = Paint(Paint.ANTI_ALIAS_FLA
 }
 
 private val SLOTS = listOf(0.5f, 0.24f, 0.76f, 0.37f, 0.63f)
+private const val FEET = 0.86f
 
 /**
  * "Add a star": a QR code for the parent's phone on the left; on the right a stage where each
- * new drawing walks in from the wings and waves the moment the phone sends it.
+ * new drawing walks in from the wings, into a warm spotlight, and waves the moment the phone sends it.
  */
 @Composable
 fun AddStar(api: ServerApi) {
@@ -64,6 +85,9 @@ fun AddStar(api: ServerApi) {
     val clock = remember { DoubleArray(1) }
     var pairing by remember { mutableStateOf<Pairing?>(null) }
     var status by remember { mutableStateOf("Getting a code…") }
+    var arrived by remember { mutableStateOf<String?>(null) }
+    var arrivals by remember { mutableIntStateOf(0) }
+    var spotX by remember { mutableStateOf(SLOTS[0]) }
     val paint = remember { labelPaint(context) }
 
     LaunchedEffect(Unit) {
@@ -82,12 +106,15 @@ fun AddStar(api: ServerApi) {
                     label = member.name
                     x = 1.15f
                     heightFraction = 0.5f
-                    feetY = 0.86f
+                    feetY = FEET
                 }
                 if (actors.size >= SLOTS.size) actors.removeAt(0)
                 actors.add(actor)
-                actor.walkTo(SLOTS[(actors.size - 1) % SLOTS.size], clock[0], arrive = "wave")
-                status = "${member.name} has arrived!"
+                val slot = SLOTS[(actors.size - 1) % SLOTS.size]
+                actor.walkTo(slot, clock[0], arrive = "wave")
+                spotX = slot            // the light swings over to wherever the newcomer is heading
+                arrived = member.name
+                arrivals++
             }
             delay(1000)
         }
@@ -95,37 +122,132 @@ fun AddStar(api: ServerApi) {
 
     Row(Modifier.fillMaxSize().background(Ink.paper)) {
         Column(
-            Modifier.width(310.dp).fillMaxHeight().padding(24.dp),
+            Modifier.width(310.dp).fillMaxHeight().padding(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text("Add a star!", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Ink.ink)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             Box(
-                Modifier.size(180.dp).clip(RoundedCornerShape(14.dp)).background(Ink.card).padding(10.dp),
+                Modifier.size(196.dp).clip(RoundedCornerShape(16.dp)).background(Ink.card)
+                    .border(BorderStroke(3.dp, Ink.ink), RoundedCornerShape(16.dp)).padding(11.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 pairing?.let { Image(it.qr, contentDescription = "QR code to open on a phone", Modifier.fillMaxSize()) }
             }
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(10.dp))
             pairing?.let {
-                Text("Code  ${it.code}", fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 17.sp,
-                    color = Ink.accent, letterSpacing = 3.sp)
+                Row(
+                    Modifier.background(Ink.card, RoundedCornerShape(50)).border(BorderStroke(2.dp, Ink.line), RoundedCornerShape(50))
+                        .padding(horizontal = 14.dp, vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("CODE", fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Ink.soft, letterSpacing = 1.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(it.code, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
+                        color = Ink.accent, letterSpacing = 4.sp)
+                }
             }
-            Spacer(Modifier.height(9.dp))
-            Text(
-                "1  Scan with a grown-up's phone\n2  Photograph your drawing\n3  Watch it walk in!",
-                fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Ink.soft,
-                lineHeight = 19.sp,
-            )
+            Spacer(Modifier.height(14.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Step("📷", "Scan with a grown-up's phone")
+                Step("✂️", "Photograph your drawing")
+                Step("✨", "Watch it walk in!")
+            }
         }
         Box(Modifier.weight(1f).fillMaxHeight()) {
-            Stage(actors, labelPaint = paint, onFrame = { clock[0] = it })
-            Text(
-                status, fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink.ink,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp),
-            )
+            val x by animateFloatAsState(spotX, tween(1200), label = "spot")
+            val breathe by rememberInfiniteTransition(label = "breathe")
+                .animateFloat(0.85f, 1f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "breathe")
+            Canvas(Modifier.fillMaxSize()) {
+                paperStage()
+                spotlight(x, FEET, breathe)
+            }
+            Stage(actors, transparent = true, labelPaint = paint, onFrame = { clock[0] = it })
+            StatusPill(arrived, status, arrivals, Modifier.align(Alignment.TopCenter).padding(top = 22.dp))
         }
+    }
+}
+
+/** One instruction row: an emoji badge, then the words. */
+@Composable
+private fun Step(icon: String, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(28.dp).background(Ink.paper2, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+            Text(icon, fontSize = 14.sp)
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(text, fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink.ink,
+            modifier = Modifier.width(210.dp))
+    }
+}
+
+/** "X has arrived!" as a bright pill that pops in; a quieter paper pill for the waiting messages. */
+@Composable
+private fun StatusPill(arrived: String?, status: String, arrivals: Int, modifier: Modifier) {
+    if (arrived == null) {
+        Text(status, fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink.soft,
+            textAlign = TextAlign.Center,
+            modifier = modifier.background(Ink.card, RoundedCornerShape(50)).border(BorderStroke(2.dp, Ink.line), RoundedCornerShape(50))
+                .padding(horizontal = 16.dp, vertical = 3.dp))
+        return
+    }
+    // Restart the pop each time someone new arrives.
+    var popped by remember(arrivals) { mutableStateOf(false) }
+    LaunchedEffect(arrivals) { popped = true }
+    val pop by animateFloatAsState(if (popped) 1f else 0.6f,
+        spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow), label = "pop")
+    Row(
+        modifier.scale(pop).background(Ink.accent, RoundedCornerShape(50)).border(BorderStroke(3.dp, Color.White), RoundedCornerShape(50))
+            .padding(horizontal = 18.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("🎉", fontSize = 16.sp)
+        Spacer(Modifier.width(8.dp))
+        Text("$arrived has arrived!", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
+    }
+}
+
+/** Warm paper with a crayon-blue floor line (matches the Stage's default backdrop). */
+internal fun DrawScope.paperStage() {
+    drawRect(Brush.verticalGradient(listOf(Ink.paper, Ink.paper2)))
+    val floor = size.height * 0.9f
+    drawRect(Color(0xFFE9D3A8), topLeft = Offset(0f, floor), size = Size(size.width, size.height - floor))
+    drawLine(Ink.blue, Offset(0f, floor), Offset(size.width, floor), strokeWidth = 6f)
+}
+
+/**
+ * A soft stage light at stage fraction [x]: a faint cone from the top and a warm pool on the
+ * floor at [feetY]. Several stacked, widening cones give the beam a soft edge without a blur.
+ */
+internal fun DrawScope.spotlight(x: Float, feetY: Float, strength: Float = 1f, coneAlpha: Float = 1f, poolScale: Float = 1f) {
+    val cx = x * size.width
+    val fy = feetY * size.height
+    val pool = size.height * 0.26f * poolScale
+    if (coneAlpha > 0f) {
+        for (k in 0 until 4) {
+            val spread = 0.55f + k * 0.18f
+            val path = Path().apply {
+                moveTo(cx - pool * 0.12f * spread, 0f)
+                lineTo(cx + pool * 0.12f * spread, 0f)
+                lineTo(cx + pool * spread, fy)
+                lineTo(cx - pool * spread, fy)
+                close()
+            }
+            // Flat fills: a faint vertical gradient bands visibly on 8-bit TV panels, nested flat cones don't.
+            drawPath(path, Color(0xFFFFD98A).copy(alpha = 0.05f * coneAlpha * strength))
+        }
+    }
+    // The pool: a circular radial gradient squashed into an ellipse, so it fades out on every edge.
+    withTransform({ scale(1f, 0.24f, pivot = Offset(cx, fy)) }) {
+        drawCircle(
+            Brush.radialGradient(
+                0f to Color(0xFFFFF0B8).copy(alpha = 0.95f * strength),
+                0.45f to Color(0xFFFFD27A).copy(alpha = 0.55f * strength),
+                1f to Color.Transparent,
+                center = Offset(cx, fy), radius = pool * 1.15f,
+            ),
+            radius = pool * 1.15f, center = Offset(cx, fy),
+        )
     }
 }

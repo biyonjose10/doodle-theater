@@ -1,7 +1,7 @@
 import pytest
 
 from doodle_theater.story import make_episode, offline
-from doodle_theater.story.schema import BACKDROPS, validate
+from doodle_theater.story.schema import BACKDROPS, is_emoji, validate
 
 CASTS = [
     [{"id": "a1", "name": "Captain Blob", "description": ""}],
@@ -43,3 +43,23 @@ def test_agent_failure_falls_back_to_templates(tmp_path):
 def test_invalid_agent_episode_is_rejected(tmp_path):
     ep = make_episode("jungle", CASTS[0], tmp_path, writer=lambda t, c: {"title": "x", "scenes": {}})
     assert ep["source"] == "templates"
+
+
+@pytest.mark.parametrize("theme", sorted(BACKDROPS))
+def test_every_template_option_has_a_picture_emoji(theme):
+    ep = offline.episode(theme, CASTS[1], seed=1)
+    options = ep["scenes"]["start"]["choice"]["options"]
+    emojis = [o.get("emoji") for o in options]
+    assert all(is_emoji(e) for e in emojis), emojis
+    assert emojis[0] != emojis[1]  # the two pictures must tell the options apart
+
+
+def test_validator_checks_the_choice_emoji():
+    ep = offline.episode("space", CASTS[1], seed=1)
+    opts = ep["scenes"]["start"]["choice"]["options"]
+    del opts[0]["emoji"]                      # optional: an agent episode without one still plays
+    assert validate(ep, ["a1", "b2"], "space") == []
+    opts[1]["emoji"] = "a big moon picture"   # junk: words, too long
+    assert any("emoji" in e for e in validate(ep, ["a1", "b2"], "space"))
+    opts[1]["emoji"] = "moon"
+    assert any("emoji" in e for e in validate(ep, ["a1", "b2"], "space"))

@@ -27,6 +27,15 @@ MAX_WORDS_PER_BEAT = 40
 _WORD = re.compile(r"[A-Za-z']+")
 
 
+MAX_EMOJI_CHARS = 8  # one emoji, allowing variation selectors and ZWJ sequences
+
+
+def is_emoji(value) -> bool:
+    """Loose check for 'one picture emoji': short, and no letters, digits or spaces (so not a word)."""
+    return (isinstance(value, str) and 0 < len(value) <= MAX_EMOJI_CHARS
+            and not any(ch.isalnum() or ch.isspace() for ch in value))
+
+
 def words(text: str) -> list[str]:
     return [w.lower() for w in _WORD.findall(text)]
 
@@ -54,6 +63,9 @@ def validate(ep: dict, cast_ids: list[str], theme: str) -> list[str]:
         for o in choice["options"]:
             if not str(o.get("label", "")).strip() or len(o.get("label", "")) > 32:
                 errs.append("each choice label must be 1-32 characters")
+            if "emoji" in o and not is_emoji(o["emoji"]):
+                errs.append(f"choice emoji must be one picture emoji (max {MAX_EMOJI_CHARS} characters), "
+                            f"not {o['emoji']!r}")
             if o.get("next") not in scenes or o.get("next") == "start":
                 errs.append(f"choice option points to unknown scene {o.get('next')!r}")
     if set(scenes) != {"start", *targets}:

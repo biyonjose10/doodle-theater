@@ -4,6 +4,7 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
@@ -19,6 +20,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -31,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -63,7 +67,9 @@ import com.doodletheater.tv.ui.Theme
 import com.doodletheater.tv.ui.TvCard
 import com.doodletheater.tv.ui.labelPaint
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 
@@ -72,6 +78,7 @@ private sealed interface Phase {
     data object Title : Phase
     data object Playing : Phase
     data class Choosing(val choice: Choice) : Phase
+    data object WindDown : Phase                          // the stage dims to night; no cards yet
     data object Ended : Phase
     data class Failed(val message: String) : Phase
 }
@@ -84,7 +91,14 @@ private val LOOPING = setOf("walk", "run", "dance", "wave", "cheer", "scared", "
  * ◀ ▶ picks a star and OK makes them jump at any moment; ⏯ / "Alexa, pause" pauses.
  */
 @Composable
-fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
+fun StoryPlayer(
+    api: ServerApi,
+    theme: Theme,
+    onHome: () -> Unit,
+    allowWatchAgain: () -> Boolean = { true },
+    bedtime: Boolean = false,
+    onStoryStart: () -> Unit = {},
+) {
     val context = LocalContext.current
     val motions = remember { RigStore.motions(context) }
     val narrator = remember { Narrator(context) }
@@ -105,6 +119,7 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
     val picked = remember { arrayOfNulls<CompletableDeferred<String>>(1) }
     val keys = remember { FocusRequester() }
     val firstOption = remember { FocusRequester() }
+    val night = remember { Animatable(0f) }               // darkness of the wind-down overlay
 
     // Media session: Fire TV routes "Alexa, pause/resume" and the remote's ⏯ here.
     DisposableEffect(Unit) {
@@ -143,6 +158,25 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
 
     suspend fun waitWhilePaused() = snapshotFlow { paused }.first { !it }
 
+    /** Like delay(), but the clock stops while the story is paused. */
+    suspend fun pausableDelay(ms: Long) {
+        var left = ms
+        while (left > 0) { waitWhilePaused(); val step = minOf(left, 50L); delay(step); left -= step }
+    }
+
+    /** Dim the stage to [NIGHT_ALPHA] over [ms], smoothly, holding still while paused. */
+    suspend fun dimToNight(ms: Long) {
+        var t = 0L
+        var last = withFrameMillis { it }
+        while (t < ms) {
+            val now = withFrameMillis { it }
+            if (!paused) t += (now - last).coerceIn(0L, 100L)
+            last = now
+            val f = (t.toFloat() / ms).coerceIn(0f, 1f)
+            night.snapTo(NIGHT_ALPHA * f * f * (3 - 2 * f))   // smoothstep: eases in and out
+        }
+    }
+
     suspend fun beat(b: Beat, ep: Episode) {
         caption = b; highlight = -1 to -1
         speaker = ep.cast.firstOrNull { it.id == b.speaker }?.name
@@ -172,9 +206,13 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
     }
 
     LaunchedEffect(run) {
+        // The TV's bedtime setting (clock or the parent's chip) decides the calmer narration on the server.
         val ep = episode ?: runCatching {
-            Episode.parse(api.json("/api/story", "POST", JSONObject().put("theme", theme.id)).toString())
+            Episode.parse(api.json("/api/story", "POST",
+                JSONObject().put("theme", theme.id).put("bedtime", bedtime)).toString())
         }.getOrElse { phase = Phase.Failed("Couldn't write a story: ${it.message}"); return@LaunchedEffect }
+        onStoryStart()
+        night.snapTo(0f)
         if (episode == null) {
             phase = Phase.Loading("Calling the stars to the stage…")
             ep.cast.forEachIndexed { i, s ->
@@ -216,10 +254,22 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
                 ep.scenes[next]
             } else null
         }
+        // Wind-down for bedtime: one gentle wave, the lights go down, and the narrator says goodnight.
         caption = null
-        actors.forEach { it.playFor("cheer", clock[0], 3.0) }
+        phase = Phase.WindDown
+        actors.forEach { it.playFor("wave", clock[0], 1.2) }   // wave is a 1.2 s loop: once, then idle
+        coroutineScope {
+            val dim = launch { dimToNight(9_000) }
+            waitWhilePaused()
+            narrator.speak("The end!", 1.0f, 0.85f) { _, _ -> }
+            pausableDelay(1_200)
+            val names = joinNames(ep.cast.map { it.name })
+            waitWhilePaused()
+            narrator.speak(if (names.isEmpty()) "Goodnight." else "Goodnight, $names.", 0.95f, 0.78f) { _, _ -> }
+            dim.join()
+        }
+        pausableDelay(600)
         phase = Phase.Ended
-        narrator.speak("The end!", 1.1f, 0.9f) { _, _ -> }
     }
 
     LaunchedEffect(phase) {
@@ -248,6 +298,7 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
         }
         Stage(actors, transparent = true, spotlight = if (phase == Phase.Playing) actors.getOrNull(selected) else null,
             labelPaint = paint, onFrame = { clock[0] = it })
+        NightSky(night.value)                                  // above the stage, below every card
 
         caption?.let { b ->
             Column(
@@ -277,8 +328,9 @@ fun StoryPlayer(api: ServerApi, theme: Theme, onHome: () -> Unit) {
             is Phase.Failed -> Banner(p.message, "Press Back to go home")
             Phase.Title -> episode?.let { Banner(it.title, theme.title) }
             is Phase.Choosing -> ChoiceCards(p.choice, firstOption) { picked[0]?.complete(it) }
-            Phase.Ended -> EndCards(firstOption, onAgain = { run++ }, onHome = onHome)
-            Phase.Playing -> {}
+            Phase.Ended -> GoodnightCard(episode?.cast?.map { it.name }.orEmpty(), firstOption,
+                onAgain = { run++ }, onHome = onHome, allowWatchAgain = allowWatchAgain())
+            Phase.Playing, Phase.WindDown -> {}
         }
         AnimatedVisibility(paused, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
             Text("⏸  Paused", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, color = Color.White,
@@ -310,39 +362,28 @@ private fun ChoiceCards(choice: Choice, first: FocusRequester, onPick: (String) 
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
             choice.options.forEachIndexed { i, o ->
-                TvCard(onClick = { onPick(o.next) }, tint = if (i == 0) Ink.accent else Ink.blue, width = 300, height = 100,
+                TvCard(onClick = { onPick(o.next) }, tint = if (i == 0) Ink.accent else Ink.blue, width = 320, height = 104,
                     modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) {
-                    Column(Modifier.fillMaxSize().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center) {
-                        // Which way to press, for children who can't read the option yet.
-                        Text(if (i == 0) "◀  LEFT" else "RIGHT  ▶", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold,
-                            fontSize = 12.sp, color = Ink.ink,
-                            modifier = Modifier.background(Ink.paper, RoundedCornerShape(50)).padding(horizontal = 10.dp))
-                        Spacer(Modifier.height(6.dp))
-                        Text(o.label, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.White,
-                            textAlign = TextAlign.Center, lineHeight = 22.sp)
+                    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        // The picture, for children who can't read the option yet (older episodes have none).
+                        if (o.emoji.isNotBlank()) {
+                            Box(Modifier.size(56.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
+                                contentAlignment = Alignment.Center) {
+                                Text(o.emoji, fontSize = 30.sp, lineHeight = 34.sp, textAlign = TextAlign.Center)
+                            }
+                            Spacer(Modifier.width(14.dp))
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                            // Which way to press, for the same reason.
+                            Text(if (i == 0) "◀  LEFT" else "RIGHT  ▶", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold,
+                                fontSize = 12.sp, color = Ink.ink,
+                                modifier = Modifier.background(Ink.paper, RoundedCornerShape(50)).padding(horizontal = 10.dp))
+                            Spacer(Modifier.height(6.dp))
+                            Text(o.label, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp,
+                                color = Color.White, lineHeight = 22.sp)
+                        }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EndCards(first: FocusRequester, onAgain: () -> Unit, onHome: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("The End", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 56.sp, color = Ink.ink,
-            modifier = Modifier.background(Color(0xEEFFFBF0), RoundedCornerShape(26.dp)).padding(horizontal = 40.dp))
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            TvCard(onClick = onAgain, tint = Ink.accent, width = 170, height = 64, modifier = Modifier.focusRequester(first)) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("🔁  Watch again", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
-                }
-            }
-            TvCard(onClick = onHome, tint = Ink.blue, width = 170, height = 64) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("🏠  Home", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
                 }
             }
         }

@@ -6,12 +6,23 @@ same schema check as the AI-written ones.
 
 Placeholders: {A} first star, {B} second star (falls back to {A} when only one was drawn),
 {ALL} everyone. In stage directions, who = "A" | "B" | "ALL".
+Each choice option is (label, emoji): the picture lets children who can't read yet pick too.
 """
 from __future__ import annotations
 
 import random
+import re
+
+from .schema import MAX_WORDS_PER_BEAT, words
 
 N = "narrator"
+
+# Bedtime: swap the lively moves for calm ones and make every ending sleepy.
+BEDTIME_MOVES = {"scared": "wave", "run": "walk"}
+SLEEPY_WORDS = {"sleep", "sleepy", "asleep", "yawn", "yawned", "snuggle", "snuggled", "dream", "dreams",
+                "goodnight", "bedtime", "cosy", "cozy", "snore", "snored", "drowsy"}
+SLEEPY_LINE = "Then everyone yawned a big, sleepy yawn."
+_THE_END = re.compile(r"\s*The end!\s*$", re.IGNORECASE)
 
 
 def beat(text: str, *actions: tuple, speaker: str = N) -> dict:
@@ -27,7 +38,7 @@ TEMPLATES: dict[str, dict] = {
                  ("ALL", "enter"), ("A", "wave", "window")),
             beat("Look! A little star is falling, and it's crying all the way down!", ("A", "scared", "crying"), speaker="A"),
             beat("We have to help it, said {B}, and everybody jumped into the rocket.", ("B", "jump", "jumped")),
-        ], ("Fly to the Moon", "Chase the comet")),
+        ], (("Fly to the Moon", "🌙"), ("Chase the comet", "☄️"))),
         "a": ("moon", [
             beat("The rocket landed softly on the Moon, where the dust was as bouncy as a trampoline.",
                  ("ALL", "jump", "bouncy")),
@@ -52,7 +63,7 @@ TEMPLATES: dict[str, dict] = {
             beat("It sounds like a waterfall! said {A}. Let's find it!", ("A", "jump", "waterfall"), speaker="A"),
             beat("A parrot squawked from a tree. Two paths, two adventures. Which way should they go?",
                  ("B", "wave", "parrot")),
-        ], ("Follow the river", "Climb to the temple")),
+        ], (("Follow the river", "🏞️"), ("Climb to the temple", "🏛️"))),
         "a": ("river", [
             beat("They hopped along the river stones, one, two, three, without getting their feet wet.",
                  ("ALL", "jump", "hopped")),
@@ -75,7 +86,7 @@ TEMPLATES: dict[str, dict] = {
                  ("ALL", "enter"), ("A", "wave", "fish")),
             beat("Bubble trouble! A little octopus has lost its favourite shell.", ("B", "scared", "trouble")),
             beat("Don't worry, said {A}. We'll find it before bedtime!", ("A", "cheer", "find"), speaker="A"),
-        ], ("Explore the shipwreck", "Swim through the kelp")),
+        ], (("Explore the shipwreck", "🚢"), ("Swim through the kelp", "🌿"))),
         "a": ("shipwreck", [
             beat("The old shipwreck creaked and groaned, but {ALL} were very brave.", ("ALL", "scared", "creaked")),
             beat("Inside a treasure chest, between the gold coins, the shell was shining pink.", ("A", "jump", "shining")),
@@ -96,7 +107,7 @@ TEMPLATES: dict[str, dict] = {
             beat("That must be the dragon, whispered {B}. Maybe it has a cold.", ("B", "wave", "dragon"), speaker="B"),
             beat("Let's help it feel better, said {A}, marching bravely through the gate.", ("A", "walk", "marching"),
                  speaker="A"),
-        ], ("Ask the king", "Visit the dragon")),
+        ], (("Ask the king", "👑"), ("Visit the dragon", "🐉"))),
         "a": ("throne_room", [
             beat("The king was sitting on his throne, eating a very large sandwich.", ("A", "wave", "king")),
             beat("A dragon with a cold? he said. It needs honey and a warm scarf!", ("B", "jump", "honey")),
@@ -118,7 +129,7 @@ TEMPLATES: dict[str, dict] = {
             beat("Tonight is the Snow Party, said {A}, but we've lost the party lanterns!", ("A", "scared", "lost"),
                  speaker="A"),
             beat("A snowman pointed his carrot nose. Two places to look. Where should they go?", ("B", "wave", "snowman")),
-        ], ("Search the ice cave", "Climb the mountain")),
+        ], (("Search the ice cave", "🧊"), ("Climb the mountain", "🏔️"))),
         "a": ("ice_cave", [
             beat("The ice cave was blue and glittery, and their voices echoed: hello, hello, hello!",
                  ("ALL", "wave", "hello")),
@@ -140,7 +151,7 @@ TEMPLATES: dict[str, dict] = {
                  ("ALL", "enter"), ("ALL", "jump", "Stomp")),
             beat("A baby dinosaur ran up, crying. Mama! I can't find my Mama!", ("B", "scared", "crying")),
             beat("We'll help you, said {A}, giving the baby a pat on the nose.", ("A", "wave", "help"), speaker="A"),
-        ], ("Look by the volcano", "Check the big nest")),
+        ], (("Look by the volcano", "🌋"), ("Check the big nest", "🥚"))),
         "a": ("volcano", [
             beat("The volcano rumbled, and puffs of smoke went up like grey balloons.", ("ALL", "scared", "rumbled")),
             beat("And there, warming her feet, was Mama dinosaur! She roared a happy roar.", ("A", "cheer", "roared")),
@@ -161,7 +172,34 @@ def _fill(text: str, names: dict[str, str]) -> str:
     return text.format(**names)
 
 
-def episode(theme: str, cast: list[dict], seed: int | None = None) -> dict:
+def bedtime_calm(ep: dict) -> dict:
+    """Make an episode (template or agent-written) gentle for bedtime, in place, keeping it valid.
+
+    'scared' and 'run' become 'wave' and 'walk'; each ending's last beat gets a sleepy line before
+    "The end!" unless it is already sleepy (or, if that would pass the word limit, a beat of its own).
+    """
+    for sc in ep["scenes"].values():
+        for b in sc["beats"]:
+            for a in b.get("actions", []):
+                a["do"] = BEDTIME_MOVES.get(a.get("do"), a.get("do"))
+    for sid, sc in ep["scenes"].items():
+        if sid == "start" or not sc["beats"]:
+            continue
+        last = sc["beats"][-1]
+        if SLEEPY_WORDS & set(words(last["text"])):
+            continue
+        body = _THE_END.sub("", last["text"]).rstrip()
+        merged = f"{body} {SLEEPY_LINE} The end!"
+        if len(words(merged)) <= MAX_WORDS_PER_BEAT:
+            last["text"] = merged
+        else:
+            last["text"] = body
+            sc["beats"].append({"speaker": N, "text": f"{SLEEPY_LINE} The end!",
+                                "actions": [{"who": last["actions"][0]["who"], "do": "idle", "at_word": "yawned"}]})
+    return ep
+
+
+def episode(theme: str, cast: list[dict], seed: int | None = None, bedtime: bool = False) -> dict:
     """Build a playable episode for `theme` starring `cast` ([{id, name, description}])."""
     t = TEMPLATES[theme]
     rng = random.Random(seed)
@@ -187,6 +225,8 @@ def episode(theme: str, cast: list[dict], seed: int | None = None) -> dict:
     bd, beats, (opt_a, opt_b) = t["start"]
     start = scene(bd, beats)
     start["choice"] = {"prompt": "What should they do?",
-                       "options": [{"label": opt_a, "next": "a"}, {"label": opt_b, "next": "b"}]}
-    return {"title": _fill(t["title"], names), "theme": theme,
-            "scenes": {"start": start, "a": scene(*t["a"]), "b": scene(*t["b"])}}
+                       "options": [{"label": opt_a[0], "emoji": opt_a[1], "next": "a"},
+                                   {"label": opt_b[0], "emoji": opt_b[1], "next": "b"}]}
+    ep = {"title": _fill(t["title"], names), "theme": theme,
+          "scenes": {"start": start, "a": scene(*t["a"]), "b": scene(*t["b"])}}
+    return bedtime_calm(ep) if bedtime else ep

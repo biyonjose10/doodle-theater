@@ -2,9 +2,14 @@
 
 Neural voices: a warm narrator, and children's voices for the characters' own lines. The
 TV reads `audio` + `marks` when present and falls back to its own TTS when they aren't.
+
+Bedtime episodes are read slower and softer through SSML <prosody> (neural voices support
+`rate` and `volume`, not `pitch`). Polly then reports speech-mark offsets into the SSML string,
+so they are mapped back to character indices into the beat's plain text, which the TV highlights.
 """
 from __future__ import annotations
 
+import bisect
 import json
 import logging
 from pathlib import Path
@@ -14,6 +19,42 @@ from ..config import AWS_REGION, NARRATOR_VOICE
 log = logging.getLogger(__name__)
 
 CHARACTER_VOICES = ["Ivy", "Justin", "Kevin", "Salli", "Joey"]   # Ivy/Justin/Kevin are child voices
+
+BEDTIME_OPEN = '<speak><prosody rate="90%" volume="-3dB">'
+BEDTIME_CLOSE = "</prosody></speak>"
+_ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;"}
+
+
+def polly_input(text: str, bedtime: bool) -> tuple[str, list[int]]:
+    """What to send Polly for `text`, and the UTF-8 byte offset where each character of `text` begins in it.
+
+    Plain text is sent as-is; bedtime wraps it in SSML (escaping &, < and >). The offsets list has
+    one entry per character plus a final one for the end of the text, for mapping marks back.
+    """
+    prefix = BEDTIME_OPEN if bedtime else ""
+    pos = len(prefix.encode("utf-8"))
+    parts, starts = [prefix], []
+    for ch in text:
+        out = _ESCAPES.get(ch, ch) if bedtime else ch
+        starts.append(pos)
+        parts.append(out)
+        pos += len(out.encode("utf-8"))
+    starts.append(pos)
+    if bedtime:
+        parts.append(BEDTIME_CLOSE)
+    return "".join(parts), starts
+
+
+def to_char_marks(raw: list[dict], starts: list[int]) -> list[dict]:
+    """Polly word marks (byte offsets into what was sent) -> {time, start, end} as plain-text char indices."""
+    n = len(starts) - 1
+    marks = []
+    for m in raw:
+        # start: the character whose bytes contain m["start"]; end: first character starting at/after m["end"].
+        start = min(max(bisect.bisect_right(starts, m["start"]) - 1, 0), n)
+        end = min(max(bisect.bisect_left(starts, m["end"]), start), n)
+        marks.append({"time": m["time"], "start": start, "end": end})
+    return marks
 
 
 def _polly():
@@ -25,27 +66,25 @@ def narrate(ep: dict, media_dir: Path) -> dict:
     """Add `audio` and `marks` to every beat. Leaves the episode unchanged if Polly fails."""
     polly = _polly()
     voices = {c["id"]: CHARACTER_VOICES[i % len(CHARACTER_VOICES)] for i, c in enumerate(ep["cast"])}
+    bedtime = bool(ep.get("bedtime"))
+    text_type = "ssml" if bedtime else "text"
     out = media_dir / ep["id"]
     out.mkdir(parents=True, exist_ok=True)
     try:
         for sid, scene in ep["scenes"].items():
             for i, beat in enumerate(scene["beats"]):
                 voice = voices.get(beat.get("speaker"), NARRATOR_VOICE)
-                text = beat["text"]
-                audio = polly.synthesize_speech(Text=text, VoiceId=voice, Engine="neural", OutputFormat="mp3")
+                sent, starts = polly_input(beat["text"], bedtime)
+                audio = polly.synthesize_speech(Text=sent, TextType=text_type, VoiceId=voice, Engine="neural",
+                                                OutputFormat="mp3")
                 name = f"{sid}-{i}.mp3"
                 (out / name).write_bytes(audio["AudioStream"].read())
-                marks_raw = polly.synthesize_speech(Text=text, VoiceId=voice, Engine="neural",
+                marks_raw = polly.synthesize_speech(Text=sent, TextType=text_type, VoiceId=voice, Engine="neural",
                                                     OutputFormat="json", SpeechMarkTypes=["word"])
-                marks = []
-                for line in marks_raw["AudioStream"].read().decode("utf-8").splitlines():
-                    m = json.loads(line)
-                    # Polly reports byte offsets into the UTF-8 text; the TV indexes characters.
-                    start = len(text.encode("utf-8")[:m["start"]].decode("utf-8", "ignore"))
-                    end = len(text.encode("utf-8")[:m["end"]].decode("utf-8", "ignore"))
-                    marks.append({"time": m["time"], "start": start, "end": end})
+                raw = [json.loads(line) for line in marks_raw["AudioStream"].read().decode("utf-8").splitlines()
+                       if line.strip()]
                 beat["audio"] = f"/media/{ep['id']}/{name}"
-                beat["marks"] = marks
+                beat["marks"] = to_char_marks(raw, starts)
         ep["voice"] = "polly"
     except Exception as e:
         log.warning("Polly narration failed, the TV will use its own voice: %s", e)

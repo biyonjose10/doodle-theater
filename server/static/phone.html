@@ -21,15 +21,51 @@
   main { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; }
   h1 { font-size: 30px; margin: 4px 0 2px; line-height: 1.1; }
   h1 span { color: var(--accent); }
-  .sub { color: var(--soft); margin: 0 0 18px; }
-  .card { background: var(--card); border: 2px solid var(--line); border-radius: 22px; padding: 18px; margin: 14px 0; }
+  .sub { color: var(--soft); margin: 0 0 14px; }
+
+  /* 3-step progress: driven purely by which section is visible (no JS needed) */
+  .steps { list-style: none; display: flex; gap: 6px; margin: 0 0 16px; padding: 0; }
+  .steps li { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 4px; border-radius: 999px; background: var(--card); border: 2px solid var(--line);
+    color: var(--soft); font-weight: 700; font-size: 15px; line-height: 1.2; white-space: nowrap;
+    transition: border-color .2s, color .2s; }
+  .steps .n { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--line); color: var(--ink); font-size: 14px; line-height: 1; }
+  /* current step */
+  main:has(#s-start:not(.hidden)) .steps li:nth-child(1),
+  main:has(#s-work:not(.hidden)) .steps li:nth-child(2),
+  main:has(#s-check:not(.hidden) #name:placeholder-shown) .steps li:nth-child(2),
+  main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(3) {
+    border-color: var(--accent); color: var(--ink); }
+  main:has(#s-start:not(.hidden)) .steps li:nth-child(1) .n,
+  main:has(#s-work:not(.hidden)) .steps li:nth-child(2) .n,
+  main:has(#s-check:not(.hidden) #name:placeholder-shown) .steps li:nth-child(2) .n,
+  main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(3) .n {
+    background: var(--accent); color: #fff; }
+  /* finished steps get a green tick */
+  main:has(#s-work:not(.hidden)) .steps li:nth-child(1) .n,
+  main:has(#s-check:not(.hidden)) .steps li:nth-child(1) .n,
+  main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(2) .n,
+  main:has(#s-done:not(.hidden)) .steps li .n { background: var(--ok); color: #fff; font-size: 0; }
+  main:has(#s-work:not(.hidden)) .steps li:nth-child(1) .n::after,
+  main:has(#s-check:not(.hidden)) .steps li:nth-child(1) .n::after,
+  main:has(#s-check:not(.hidden) #name:not(:placeholder-shown)) .steps li:nth-child(2) .n::after,
+  main:has(#s-done:not(.hidden)) .steps li .n::after { content: "✓"; font-size: 14px; }
+  main:has(#s-done:not(.hidden)) .steps li { color: var(--ink); }
+
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 22px; padding: 18px; margin: 0 0 14px; }
+  #s-check > .card:last-child { margin-bottom: 0; }
   .big { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 64px;
-    border: 0; border-radius: 18px; background: var(--accent); color: #fff; font: 700 21px "Baloo 2", system-ui;
-    cursor: pointer; box-shadow: 0 4px 0 #a63c22; }
+    padding: 10px 16px; border: 0; border-radius: 18px; background: var(--accent); color: #fff;
+    font: 700 21px/1.2 "Baloo 2", system-ui, sans-serif; cursor: pointer; box-shadow: 0 4px 0 #a63c22;
+    -webkit-tap-highlight-color: transparent; }
   .big:active { transform: translateY(2px); box-shadow: 0 2px 0 #a63c22; }
+  .big:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
   .big.secondary { background: var(--blue); box-shadow: 0 4px 0 #3f5cae; }
-  .big[disabled] { opacity: .5; }
-  ul.tips { margin: 6px 0 0; padding-left: 20px; color: var(--soft); }
+  .big.secondary:active { box-shadow: 0 2px 0 #3f5cae; }
+  .big[disabled] { opacity: .5; cursor: default; }
+  ul.tips { margin: 14px 0 0; padding-left: 22px; color: var(--soft); }
+  ul.tips li + li { margin-top: 2px; }
   .hidden { display: none !important; }
   .spinner { width: 54px; height: 54px; border: 6px solid var(--line); border-top-color: var(--accent);
     border-radius: 50%; animation: spin 0.9s linear infinite; margin: 18px auto; }
@@ -37,19 +73,46 @@
   canvas#preview { width: 100%; aspect-ratio: 1; display: block; border-radius: 16px;
     background: repeating-linear-gradient(0deg, transparent 0 31px, var(--line) 31px 32px); }
   .desc { font-style: italic; color: var(--soft); margin: 8px 2px 0; }
-  label { display: block; font-weight: 700; margin: 6px 0; }
-  input[type=text] { width: 100%; font: 22px "Baloo 2", system-ui; padding: 12px 14px; border-radius: 14px;
-    border: 2px solid var(--line); background: var(--paper); color: var(--ink); }
-  details summary { cursor: pointer; font-weight: 700; color: var(--blue); }
-  .editor { position: relative; margin-top: 10px; touch-action: none; user-select: none; }
+  label { display: block; font-weight: 700; font-size: 19px; margin: 0 0 8px; }
+  input[type=text] { width: 100%; min-height: 60px; font: 500 24px/1.2 "Baloo 2", system-ui, sans-serif;
+    padding: 12px 16px; border-radius: 16px; border: 2px solid var(--line); background: var(--paper); color: var(--ink); }
+  input[type=text]::placeholder { color: var(--soft); opacity: .7; }
+  input[type=text]:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 35%, transparent); }
+  details summary { cursor: pointer; font-weight: 700; color: var(--blue); list-style: none;
+    display: flex; align-items: center; gap: 8px; min-height: 48px; margin: -6px 0; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before { content: "▸"; display: inline-block; transition: transform .15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; border-radius: 8px; }
+  .editor { position: relative; margin-top: 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
   .editor img { width: 100%; display: block; border-radius: 12px; background: #fff; }
-  .dot { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
-    border: 3px solid #fff; box-shadow: 0 1px 4px #0006; touch-action: none; }
+  /* joint dots: letter + colour, so they read without colour vision */
+  .dot { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
+    border: 3px solid #fff; box-shadow: 0 1px 4px #0006; touch-action: none; cursor: grab;
+    display: grid; place-items: center; color: #fff; font: 700 15px/1 "Baloo 2", system-ui, sans-serif;
+    text-shadow: 0 1px 1px #0006; -webkit-tap-highlight-color: transparent;
+    transition: transform .12s ease, box-shadow .12s ease; }
+  .dot::before { content: ""; position: absolute; inset: -8px; border-radius: 50%; } /* larger touch target */
   .dot.r { background: #d63c3c; } .dot.l { background: #3c5fd6; } .dot.c { background: #333; }
-  .legend { font-size: 14px; color: var(--soft); }
-  .error { color: var(--accent); font-weight: 700; }
+  .dot.c::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+  .dot:active { transform: scale(1.4); z-index: 2; cursor: grabbing;
+    box-shadow: 0 0 0 4px rgba(255,255,255,.9), 0 0 0 6px rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.45); }
+  .legend { font-size: 15px; color: var(--soft); margin: 8px 0 0; }
+  .key { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); color: #fff; font-size: 12px; font-weight: 700;
+    line-height: 1; vertical-align: middle; position: relative; top: -2px; margin-right: 2px; }
+  .kv { white-space: nowrap; }
+  .key.r { background: #d63c3c; } .key.l { background: #3c5fd6; }
+  .key.c { background: #333; } .key.c::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+  .error { color: var(--accent); font-weight: 700; margin: 12px 0 0; }
   .done { text-align: center; }
-  .done .tick { font-size: 64px; color: var(--ok); line-height: 1; }
+  .done .tick { font-size: 64px; color: var(--ok); line-height: 1; margin-top: 4px; }
+  .done h2 { margin: 6px 0 16px; line-height: 1.2; }
+  @media (max-width: 380px) {
+    .card { padding: 16px; }
+    .big { font-size: 19px; padding: 10px 12px; }
+    .steps li { font-size: 14px; gap: 5px; }
+  }
   .meta { font-size: 13px; color: var(--soft); text-align: right; }
 </style>
 </head>
@@ -57,6 +120,11 @@
 <main>
   <h1>Doodle <span>Theater</span></h1>
   <p class="sub" id="sub">Add a star to tonight's show.</p>
+  <ol class="steps" aria-label="Steps">
+    <li><span class="n">1</span>Photo</li>
+    <li><span class="n">2</span>Check</li>
+    <li><span class="n">3</span>Send</li>
+  </ol>
 
   <section id="s-start" class="card">
     <button class="big" id="pick">📷 Photograph the drawing</button>
@@ -83,14 +151,17 @@
     <div class="card">
       <details id="fix">
         <summary>Moves look odd? Fix the joints</summary>
-        <p class="legend">Drag the dots: <b style="color:#d63c3c">red</b> is the character's right side, <b style="color:#3c5fd6">blue</b> their left.</p>
+        <p class="legend">Drag the dots onto the joints.<br>
+          <span class="kv"><span class="key r">R</span> = the character's right side,</span>
+          <span class="kv"><span class="key l">L</span> = their left,</span>
+          <span class="kv"><span class="key c"></span> = the middle</span></p>
         <div class="editor" id="editor"><img id="tex" alt="the drawing"></div>
       </details>
     </div>
     <div class="card">
       <label for="name">What's their name?</label>
       <input id="name" type="text" maxlength="24" placeholder="Captain Blob" autocomplete="off">
-      <div style="height:14px"></div>
+      <div style="height:16px"></div>
       <button class="big" id="send">✨ Send to the TV</button>
     </div>
   </section>
@@ -145,6 +216,7 @@ function placeDots() {
     const [x, y] = draft.joints[name];
     const d = document.createElement("div");
     d.className = "dot " + (name.startsWith("right") ? "r" : name.startsWith("left") ? "l" : "c");
+    d.textContent = name.startsWith("right") ? "R" : name.startsWith("left") ? "L" : "";
     d.style.left = `${(x / draft.width) * 100}%`;
     d.style.top = `${(y / draft.height) * 100}%`;
     d.title = name.replace("_", " ");

@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -56,7 +57,17 @@ val THEMES = listOf(
 
 /** Home: tonight's stars (the child's drawings) and the stories they can star in. */
 @Composable
-fun Home(api: ServerApi, onAddStar: () -> Unit, onStory: (Theme) -> Unit, onDanceParty: () -> Unit) {
+fun Home(
+    api: ServerApi,
+    onAddStar: () -> Unit,
+    onStory: (Theme) -> Unit,
+    onDanceParty: () -> Unit,
+    bedtime: Boolean = false,
+    onToggleBedtime: () -> Unit = {},
+    storyLimit: Int = 0,
+    storiesLeft: Int? = null,
+    onCycleLimit: () -> Unit = {},
+) {
     var cast by remember { mutableStateOf<List<CastMember>>(emptyList()) }
     var thumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
     var offline by remember { mutableStateOf(false) }
@@ -71,7 +82,8 @@ fun Home(api: ServerApi, onAddStar: () -> Unit, onStory: (Theme) -> Unit, onDanc
     }
 
     Column(
-        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.paper, Ink.paper2)))
+        Modifier.fillMaxSize()
+            .background(Brush.verticalGradient(if (bedtime) listOf(DuskPaper, DuskPaper2) else listOf(Ink.paper, Ink.paper2)))
             .padding(horizontal = 32.dp, vertical = 20.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -80,13 +92,20 @@ fun Home(api: ServerApi, onAddStar: () -> Unit, onStory: (Theme) -> Unit, onDanc
             KeyHint("◀ ▶ ▲ ▼", "move")
             Spacer(Modifier.width(8.dp))
             KeyHint("OK", "choose")
+            Spacer(Modifier.width(10.dp))
+            BedtimeChip(on = bedtime, onToggle = onToggleBedtime)
         }
-        Text(
-            if (offline) "Can't reach the laptop. Start the Doodle Theater server, then come back."
-            else if (cast.isEmpty()) "Draw a character, then add them as a star!"
-            else "Tonight's stars: ${cast.joinToString(", ") { it.name }}",
-            fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Ink.soft,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (offline) "Can't reach the laptop. Start the Doodle Theater server, then come back."
+                else if (storiesLeft == 0) "That's all the stories for tonight. Goodnight! 🌙"
+                else if (cast.isEmpty()) "Draw a character, then add them as a star!"
+                else "Tonight's stars: ${cast.joinToString(", ") { it.name }}",
+                fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Ink.soft,
+                modifier = Modifier.weight(1f),
+            )
+            StoriesChip(limit = storyLimit, left = storiesLeft, onCycle = onCycleLimit)
+        }
         Spacer(Modifier.height(12.dp))
         RowTitle("Your stars")
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
@@ -99,11 +118,14 @@ fun Home(api: ServerApi, onAddStar: () -> Unit, onStory: (Theme) -> Unit, onDanc
                 }
             }
             items(cast, key = { it.id }) { m ->
-                TvCard(onClick = onDanceParty, tint = Ink.card) {
+                var focused by remember { mutableStateOf(false) }
+                TvCard(onClick = onDanceParty, tint = Ink.card,
+                    modifier = Modifier.onFocusChanged { focused = it.hasFocus || it.isFocused }) {
                     Column(Modifier.fillMaxSize().padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         // The drawing sits on its own paper mat, like a sticker on a page.
                         Box(Modifier.weight(1f).fillMaxWidth().background(Ink.paper, RoundedCornerShape(9.dp)).padding(4.dp)) {
                             thumbs[m.id]?.let { Image(it, m.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+                            if (focused) TagPill("★ Selected", Modifier.align(Alignment.TopStart), color = Ink.ink.copy(alpha = 0.85f), size = 8)
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(m.name, fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Ink.ink, maxLines = 1)
@@ -115,7 +137,7 @@ fun Home(api: ServerApi, onAddStar: () -> Unit, onStory: (Theme) -> Unit, onDanc
         RowTitle(if (cast.isEmpty()) "Stories (add a star first)" else "Start tonight's story")
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
             items(THEMES, key = { it.id }) { t ->
-                TvCard(onClick = { if (cast.isNotEmpty()) onStory(t) }, tint = t.tint, width = 150, height = 100) {
+                TvCard(onClick = { if (cast.isNotEmpty() && storiesLeft != 0) onStory(t) }, tint = t.tint, width = 150, height = 100) {
                     Column(Modifier.fillMaxSize().padding(9.dp), verticalArrangement = Arrangement.SpaceBetween) {
                         Text(t.emoji, fontSize = 30.sp)
                         Column {
@@ -157,6 +179,14 @@ fun TvCard(
         ),
         glow = CardDefaults.glow(focusedGlow = Glow(Ink.accent.copy(alpha = 0.55f), 14.dp)),
     ) { content() }
+}
+
+/** A small ink tag, e.g. "★ Selected" on a focused card or above the star in the spotlight. */
+@Composable
+fun TagPill(text: String, modifier: Modifier = Modifier, color: Color = Ink.ink, size: Int = 9) {
+    Text(text, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = size.sp, color = Color.White,
+        lineHeight = (size + 3).sp, maxLines = 1,
+        modifier = modifier.background(color, RoundedCornerShape(50)).padding(horizontal = 7.dp, vertical = 1.dp))
 }
 
 /** A small remote-control hint, e.g. "OK" + "select". */

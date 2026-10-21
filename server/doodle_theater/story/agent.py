@@ -26,8 +26,9 @@ Rules:
 - Star EVERY cast member by name and work in one detail from each character's description, so the
   child recognises their drawing ("Captain Blob straightened her spiky purple crown").
 - Shape: scene "start" (3-4 beats) ends with a choice of exactly 2 options (labels max 32 characters,
-  each starting with a verb). Each option leads to its own scene (3-4 beats) that ends the story happily
-  with the words "The end!".
+  each starting with a verb, each with one picture "emoji" that shows it, e.g. 🌙 for "Fly to the Moon",
+  so children who can't read yet can choose too). Each option leads to its own scene (3-4 beats) that
+  ends the story happily with the words "The end!".
 - Every beat has at least one stage direction. Use "enter" for each character's first appearance.
   Time a direction to a word in the line with "at_word" (e.g. jump at "jumped") whenever it fits;
   that word MUST appear in the beat's text.
@@ -43,14 +44,18 @@ EXAMPLE = {
             {"speaker": "narrator", "text": "Once upon a time, Pip pressed her nose to the window.",
              "actions": [{"who": "<id>", "do": "enter"}, {"who": "<id>", "do": "wave", "at_word": "window"}]}],
             "choice": {"prompt": "What should they do?",
-                       "options": [{"label": "Fly to the Moon", "next": "moon"}, {"label": "Chase the comet", "next": "comet"}]}},
+                       "options": [{"label": "Fly to the Moon", "emoji": "🌙", "next": "moon"},
+                                   {"label": "Chase the comet", "emoji": "☄️", "next": "comet"}]}},
         "moon": {"backdrop": "moon", "beats": ["..."]},
         "comet": {"backdrop": "comet", "beats": ["..."]},
     },
 }
 
 
-def writer(theme: str, cast: list[dict]) -> dict | None:
+BEDTIME_NOTE = "It's bedtime: keep it calm and cosy, no running or scared moves, end sleepily."
+
+
+def writer(theme: str, cast: list[dict], bedtime: bool = False) -> dict | None:
     """Write an episode with the Strands agent; None if it never produced a valid one."""
     from strands import Agent, tool
     from strands.models import BedrockModel
@@ -95,8 +100,9 @@ def writer(theme: str, cast: list[dict]) -> dict | None:
                   system_prompt=SYSTEM, callback_handler=None)
     cast_lines = "\n".join(f'- id "{c["id"]}": {c["name"]}' + (f' ({c["description"]})' if c.get("description") else "")
                            for c in cast)
-    agent(f"Tonight's theme: {THEME_TITLES[theme]}.\nCast (the child's drawings):\n{cast_lines}\n\n"
-          f"Moves: {', '.join(MOVES)}.\nFormat example (ids are placeholders):\n{json.dumps(EXAMPLE)}\n\n"
+    bedtime_note = f"{BEDTIME_NOTE}\n\n" if bedtime else ""
+    agent(f"Tonight's theme: {THEME_TITLES[theme]}.\nCast (the child's drawings):\n{cast_lines}\n\n{bedtime_note}"
+          f"Moves: {', '.join(MOVES)}.\nFormat example (ids are placeholders):\n{json.dumps(EXAMPLE, ensure_ascii=False)}\n\n"
           "Write tonight's play and submit it.")
     # Smaller models sometimes stop after the look-ups, or after one rejected draft: nudge them on.
     for _ in range(3):

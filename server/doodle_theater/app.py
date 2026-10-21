@@ -149,15 +149,18 @@ def send(code: str, draft_id: str, body: Send):
 class StoryRequest(BaseModel):
     theme: str
     cast: list[str] = Field(default_factory=list, max_length=4)
+    # Calmer story, slower softer narration. None = decide by the server's clock (DT_BEDTIME_START/END).
+    bedtime: bool | None = None
 
 
 @app.post("/api/story")
 async def new_story(body: StoryRequest):
     everyone = {c["id"]: c for c in store.cast()}
     chosen = [everyone[i] for i in body.cast if i in everyone] or list(everyone.values())[-4:]
+    bedtime = story.is_bedtime() if body.bedtime is None else body.bedtime
     try:
         ep = await run_in_threadpool(story.make_episode, body.theme, chosen, store.root / "episodes",
-                                     story_writer())
+                                     story_writer(), bedtime)
     except ValueError as e:
         raise HTTPException(422, str(e))
     if vision.has_aws():  # Polly narration; without it the TV speaks with its own voice

@@ -10,7 +10,8 @@ data class Beat(val speaker: String, val text: String, val actions: List<Action>
 /** Polly speech mark: word [start, end) in the text is spoken at [timeMs]. */
 data class Mark(val timeMs: Long, val start: Int, val end: Int)
 
-data class Option(val label: String, val next: String)
+/** A choice button; [emoji] is the picture that lets pre-readers pick (blank on older episodes). */
+data class Option(val label: String, val next: String, val emoji: String = "")
 data class Choice(val prompt: String, val options: List<Option>)
 data class Scene(val id: String, val backdrop: String, val beats: List<Beat>, val choice: Choice?)
 data class Star(val id: String, val name: String, val pitch: Float)
@@ -47,7 +48,10 @@ data class Episode(val id: String, val title: String, val theme: String, val cas
                 val choice = s.optJSONObject("choice")?.let { c ->
                     val opts = c.getJSONArray("options")
                     Choice(c.optString("prompt", "What should they do?"),
-                        (0 until opts.length()).map { Option(opts.getJSONObject(it).getString("label"), opts.getJSONObject(it).getString("next")) })
+                        (0 until opts.length()).map {
+                            val op = opts.getJSONObject(it)
+                            Option(op.getString("label"), op.getString("next"), op.optString("emoji", ""))
+                        })
                 }
                 Scene(id, s.getString("backdrop"), beats, choice)
             }
