@@ -153,8 +153,9 @@ Logged while we built it, not reconstructed afterwards. Severity: **Blocker** (n
   the case form appeared. A case was filed on 21 October at about 18:20 IST.
 - **Severity:** High on a deadline. The AI story path cannot be shown live.
 - **Workaround:** The app falls back to the hand-written stories, still narrated live by Polly. A
-  local-model path for the same Strands agent (Ollama, `DT_STORY_MODEL=ollama:qwen3:8b`) is being
-  added so the agent loop can be demonstrated.
+  local-model path for the same Strands agent (Ollama, `DT_STORY_MODEL=ollama:qwen3:8b`) was added
+  as an opt-in, but in our tests the local model never produced a story that passed the validator,
+  so the demo does not rely on it.
 - **Suggestion:** Name the gate in the error, for example "Bedrock access for this account
   requires allowlisting; open a case in Account Activation → Bedrock Allowlisting", and show the
   same notice on the Bedrock console before the first call.

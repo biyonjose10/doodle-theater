@@ -1,18 +1,19 @@
 # Doodle Theater: Devpost write-up
 
 > **Submission checklist (delete this box before pasting):**
-> - [ ] **Video:** upload (under 3:00), then paste the link into the Devpost video field: `VIDEO_LINK_HERE`
-> - [ ] **Repo public:** `github.com/biyonjose10/doodle-theater` (the rigger is in `rig/`) was
->   **private** on 2026-10-21. Run the leak-checker, then make it public before submitting. The
->   Open Source mini challenge needs a public repo. There is no separate doodle-rig repo any more
->   (the old one is archived), so link only this one.
+> - [ ] **Video:** upload to YouTube as **Public** (the rules need it publicly visible; under
+>   3:00, ours is 2:52), then paste the link into the Devpost video field: `VIDEO_LINK_HERE`
 > - [ ] **Pick variants:** every `[IF STILL BLOCKED]` / `[IF BEDROCK WORKS]` pair below: keep the
 >   one that is true on submission day, delete the other and the square-bracket labels.
->   `[IF STILL BLOCKED]` is the current truth (21 Oct). Keep `[IF OLLAMA PATH IS DONE]` lines only
->   if `DT_STORY_MODEL=ollama:qwen3:8b` is committed and has produced a story end to end.
+> - [ ] **Tracks:** primary track **Fire TV**; mini challenges **AWS Builder** and **Open Source**
+>   (see *Submission form fields* below).
+> - [ ] **Product Feedback field:** paste `docs/FEEDBACK.md`, or at least its *Answers to the five
+>   feedback questions* section plus the per-tool sections. The rules want the AWS services
+>   described in this answer too, and they are.
+> - [ ] **Friction log field (optional, up to 10% bonus):** paste `docs/FRICTION.md`.
 > - [ ] **Built-with tags:** paste the list under *Built with* into the Devpost tag field one by one.
-> - [ ] **Try it out link:** `https://github.com/biyonjose10/doodle-theater` (there is no hosted
->   demo; the server runs on a laptop on the home network).
+> - [ ] **Try it out links:** the repo and the v1.0.0 release (below). There is no hosted demo;
+>   the server runs on a laptop on the home network, which the FAQ allows.
 
 ---
 
@@ -87,8 +88,7 @@ account. The Strands agent and the Bedrock vision step are written and wired (th
 fallbacks are covered by tests), but our new AWS account (India, Free plan) gets `Operation not allowed` on every Bedrock
 model call. We filed a support case for Bedrock access on 21 October. Until it is granted, the
 demo stories come from the hand-written set, narrated by Polly, and joints come from doodlerig's
-heuristic. [IF OLLAMA PATH IS DONE:] The same Strands agent also runs on a local model through
-Ollama (`DT_STORY_MODEL=ollama:qwen3:8b`), which shows the write-check-repair loop working.
+heuristic.
 
 [IF BEDROCK WORKS:] The story agent runs on Amazon Nova 2 Lite through Bedrock with the
 Guardrail attached, and Polly narrates every line. The hand-written stories take over if the
@@ -138,28 +138,41 @@ network or a model call fails.
 
 kotlin, jetpack-compose, compose-for-tv, android, fire-tv, python, fastapi, uvicorn, numpy,
 opencv, scipy, pillow, webgl, javascript, amazon-bedrock, amazon-nova, strands-agents,
-bedrock-guardrails, amazon-polly, boto3 [IF OLLAMA PATH IS DONE: , ollama]
+bedrock-guardrails, amazon-polly, boto3
 
 ---
 
+## Submission form fields
+
+- **Primary track:** Fire TV (runs on Fire OS; the demo is on the Android TV emulator, which the
+  hackathon FAQ allows).
+- **Mini challenges:** AWS Builder, Open Source.
+- **Code repository:** https://github.com/biyonjose10/doodle-theater (public, MIT licence).
+- **Open Source contribution URL:** https://github.com/biyonjose10/doodle-theater/tree/main/rig
+- **Open Source project repository URL:** https://github.com/biyonjose10/doodle-theater
+- **GitHub username:** biyonjose10
+
 ## Try it
 
-- **Repo:** https://github.com/biyonjose10/doodle-theater
+- **Repo:** https://github.com/biyonjose10/doodle-theater (setup steps in `docs/QUICKSTART.md`)
+- **TV app:** https://github.com/biyonjose10/doodle-theater/releases/tag/v1.0.0
+  (`doodle-theater-tv.apk`)
 - **Rigger (open source, MIT):** https://github.com/biyonjose10/doodle-theater/tree/main/rig
 
-Short version (full steps in the README):
+Short version:
 
-1. **Server:** Python 3.10+. In `server/`, create a venv, install the packages listed in the
-   README and `pip install -e ../rig`, then run
-   `python -m uvicorn doodle_theater.app:app --host 0.0.0.0 --port 8787`.
-2. **TV app:** JDK 17 + Android SDK. In `tv/`, run `gradlew installDebug` on an Android TV
-   emulator or a Fire TV with ADB debugging on. The emulator reaches the laptop at
-   `http://10.0.2.2:8787`; for a real Fire TV, set `SERVER_URL` to the laptop's LAN address.
-3. **Phone:** on the TV choose *Add a star* and scan the QR code.
-4. **AWS (optional):** with no credentials everything runs on the offline fallbacks. With
+1. **Server:** Python 3.10+. Run `run.ps1` (Windows) or `run.sh` (macOS/Linux) from the repo root.
+   It creates the virtual environment, installs everything and starts the server on port 8787.
+2. **TV app:** `adb install doodle-theater-tv.apk` on the Android TV emulator or a Fire TV with
+   ADB debugging on. The emulator finds the laptop by itself. On a real Fire TV, enter the
+   laptop's address on the *Set server address* screen with the remote.
+3. **No drawing handy?** Choose *Try sample stars* on the TV.
+4. **Phone:** on the TV choose *Add a star*, scan the QR code and photograph a drawing.
+5. **AWS (optional):** with no credentials everything runs on the offline fallbacks. With
    credentials for Bedrock and Polly in `us-east-1`, run `python scripts/make_guardrail.py` once
    from `server/`.
-5. To simulate "Alexa, pause" on the emulator: `adb shell cmd media_session dispatch pause`.
+6. To simulate "Alexa, pause" or "Alexa, next" on the emulator:
+   `adb shell cmd media_session dispatch pause` (or `next` / `previous` at a story choice).
 
 ---
 
@@ -191,6 +204,12 @@ transparent texture.
   followed up to where they join; the old split stays as the fallback for dresses and blobs.
 - **MIT licence.**
 
+**Why it matters:** Meta's AnimatedDrawings showed how much children love seeing their drawings
+move, but it is archived, needs a detection model in Docker and renders with desktop OpenGL.
+doodlerig does the same job in plain Python with no model and no GPU, and its output is a small
+JSON file any renderer can play: a TV, a phone browser, a game engine. It was written during the
+hackathon window (first commit 19 October 2026) and is the core of Doodle Theater.
+
 ## AWS Builder mini challenge: Bedrock + Strands
 
 - **Strands agent** (`server/doodle_theater/story/agent.py`) with three `@tool` functions. The
@@ -207,8 +226,7 @@ transparent texture.
 [IF STILL BLOCKED:] Polly runs live in the demo, and the Guardrail was created on our account.
 Bedrock model invocation has been blocked on our new account ("Operation not allowed"; support
 case filed 21 October), so the agent and vision code are written and wired but have not yet run
-against a live model, and the demo stories come from the offline set. [IF OLLAMA PATH IS DONE:] The same agent
-runs on a local Ollama model to show the loop working.
+against a live model, and the demo stories come from the offline set.
 
 [IF BEDROCK WORKS:] All four run live in the demo.
 

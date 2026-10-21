@@ -381,7 +381,9 @@ def build_scenes(tmp: Path, phone_in, phone_out, phone_max) -> tuple[list[Scene]
         Scene("3c pick a drawing, fix the cut-out", [fx], vo=[("3c_fix", 0.3)], xfade=0.3,
               side_x=LF.text_x, side_y="200",
               caps=[Cap("Lots of drawings?\nTap your star.", 0.3, 4.4, "side"),
-                    Cap("Cut-out missed\na bit? Paint it\nback with Add.", 4.6, fx.dur - 0.3, "side")]),
+                    Cap("Cut-out missed\na bit? Paint it\nback with Add.", 4.6, fx.dur - 0.3, "side"),
+                    Cap("Pig: test drawing from\nMeta AnimatedDrawings (MIT)", 6.7, fx.dur - 0.3, "note",
+                        x=LF.text_x, y="820")]),
         # story_sound: title 12.3, narration from 13.0, "What should they do?" with the picture
         # cards 32.3, focus moves to "Swim through the kelp" 36.0, kelp scene 38.0.
         Scene("4 tonight's story", [clip(story, 12.1, 42.5)], audio=[(story, 12.1, 42.5)],

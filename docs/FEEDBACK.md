@@ -21,6 +21,45 @@ path. The Bedrock and Strands points below come from building against the APIs a
 
 ---
 
+## Answers to the five feedback questions
+
+**Which tools did we use, and for what?**
+
+| Tool | Used for |
+|---|---|
+| Fire OS (Android Studio, ADB, Jetpack Compose for TV, MediaSession) | The TV app: puppet renderer, story player, D-pad and Alexa transport controls |
+| Amazon Polly (neural, word speech marks) | Narration and the read-along highlight; puppets act on their cue words |
+| Amazon Bedrock (Converse API, Amazon Nova 2 Lite) | Writing each story, and proposing a drawing's joints from the photo |
+| Strands Agents | The story agent, with a `submit_episode` tool that runs the TV's validator |
+| Amazon Bedrock Guardrails | Keeping stories and typed names suitable for young children |
+
+**What worked well, and what needs work?** See the per-tool sections below. Each one has *What
+worked well*, *What hurt* and *Suggestions*.
+
+**Onboarding (zero to hello world)**
+- **Fire OS:** about half a day. Android Studio and ADB worked at once, but the official Kotlin
+  sample's 2023-era Gradle setup took most of the time to upgrade (F2).
+- **Polly:** minutes, once the AWS account could make calls. One `SynthesizeSpeech` call gave
+  audio, and a second gave word timings.
+- **Bedrock:** we did not reach hello world. Account setup, KYC and the Free plan took a day
+  (F4–F6). After that, every model call returned "Operation not allowed", and a support case was
+  needed (see the status note above).
+- **Strands Agents:** the agent and its tools were written in an hour from the docs. It has not run
+  against a live Bedrock model, because of the block above.
+- **Guardrails:** one `CreateGuardrail` call from a script worked on the first try.
+
+**Would we build with these again?**
+- **Fire TV: yes.** It is plain Android, so our Kotlin skills carried over, and the living-room
+  screen is where family stories belong.
+- **Polly: yes.** Word speech marks made the read-along and the cue-word acting simple.
+- **Strands Agents: yes.** A tool that runs our own validator turned the agent into a
+  self-correcting story writer in very little code.
+- **Bedrock Guardrails: yes.** One setting covers input and output.
+- **Bedrock: yes,** once access works. The Converse API is the right shape: swapping models was a
+  one-line change. The opaque access gate is the one thing that would make us hesitate.
+
+---
+
 ## Fire TV / Fire OS development
 
 **What worked well**
