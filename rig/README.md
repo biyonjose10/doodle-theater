@@ -4,6 +4,12 @@
 
 ![A child's drawing, rigged](docs/overlay.png)
 
+<p align="center">
+  <img src="../docs/media/cat_walk.gif" width="220" alt="A crayon cat drawing, rigged by doodlerig, walking in place">
+  <img src="../docs/media/rig_skeletons.png" width="560" alt="Four drawings with the skeletons doodlerig found: a cat, a noodle person, a blob and a robot">
+</p>
+<p align="center"><sub>Left: a rigged drawing playing the built-in <code>walk</code> motion. Right: 16-joint skeletons on four drawings.</sub></p>
+
 `doodlerig` finds the drawing on the page, cuts it out, guesses a 16-joint skeleton, builds a
 triangle mesh, and computes skin weights. It writes a small, documented JSON file plus a
 transparent texture. Anything that can draw textured triangles can then animate the character:

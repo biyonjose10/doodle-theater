@@ -1,5 +1,21 @@
 # Doodle Theater
 
+[![tests](https://github.com/biyonjose10/doodle-theater/actions/workflows/tests.yml/badge.svg)](https://github.com/biyonjose10/doodle-theater/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Platform: Fire TV](https://img.shields.io/badge/platform-Fire%20TV-orange)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+
+<p align="center">
+  <img src="docs/media/hero.gif" width="720" alt="A drawing of a cat walks onto the Fire TV stage, the story highlights each word as it is read and offers two picture choices, then four drawn characters dance together">
+</p>
+
+**[Try it in 5 minutes](docs/QUICKSTART.md)** · [How it works](#how-it-works) · [Works offline](#works-offline) · [Setup and run](#setup-and-run) · [doodlerig](rig/)
+
+| Home | Story with picture choices | Bedtime goodnight | Phone page |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/media/home.png" width="220" alt="Home screen with the four stars and six story themes"> | <img src="docs/media/story-choices.png" width="220" alt="A space story pausing on two picture choices: Fly to the Moon or Chase the comet"> | <img src="docs/media/bedtime-goodnight.png" width="220" alt="The Goodnight card naming each star, over a dimmed night stage"> | <img src="docs/media/phone.png" width="220" alt="The phone page showing the rigged cat, and the cat arriving on the TV"> |
+| Your stars and tonight's themes | Pick with ◀ ▶, no reading needed | The stage dims; every star gets a goodnight | Snap, check, send: no app needed |
+
 Your child draws a character on paper. A parent takes a photo of it with their phone, and a few
 seconds later that same drawing walks onto the Fire TV, waves hello, and stars in tonight's bedtime
 story. The child picks what happens next with the remote, presses OK to make their character jump,

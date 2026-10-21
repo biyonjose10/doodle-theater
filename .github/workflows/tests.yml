@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Tests run fully offline: boto3 must find no AWS credentials, so every AI step
+      # takes its non-AI fallback.
+      AWS_EC2_METADATA_DISABLED: "true"
+      DT_VISION_MODEL: "off"
+      DT_STORY_MODEL: "off"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # rig/tests/test_js_parity.py checks the WebGL player against the Python reference.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install fastapi uvicorn python-multipart python-dotenv segno pillow numpy opencv-python-headless boto3 strands-agents pytest
+          pip install -e rig
+
+      - name: doodlerig tests
+        run: pytest -q rig
+
+      - name: server tests
+        working-directory: server
+        run: pytest -q
