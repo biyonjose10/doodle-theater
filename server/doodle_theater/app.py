@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import pipeline, story
+from . import pipeline, story, vision
 from .story import agent, voice
 from .config import STATIC, public_url
 from .store import Store
@@ -160,7 +160,7 @@ async def new_story(body: StoryRequest):
                                      story_writer())
     except ValueError as e:
         raise HTTPException(422, str(e))
-    if agent.available():  # Polly narration; without it the TV speaks with its own voice
+    if vision.has_aws():  # Polly narration; without it the TV speaks with its own voice
         ep = await run_in_threadpool(voice.narrate, ep, store.root / "media")
         story.save_episode(ep, store.root / "episodes")
     return ep
@@ -177,7 +177,7 @@ def get_story(ep_id: str):
 
 
 def story_writer():
-    """The AI story agent when AWS is configured, else None (templates)."""
+    """The AI story agent when a model is configured (Bedrock or local), else None (templates)."""
     return agent.writer if agent.available() else None
 
 

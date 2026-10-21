@@ -10,8 +10,9 @@ from __future__ import annotations
 import functools
 import json
 import logging
+import re
 
-from ..config import AWS_REGION, GUARDRAIL_ID, GUARDRAIL_VERSION, GUARDRAIL_NAME, STORY_MODEL
+from ..config import AWS_REGION, GUARDRAIL_ID, GUARDRAIL_VERSION, GUARDRAIL_NAME, OLLAMA_HOST, STORY_MODEL
 from .schema import BACKDROPS, MOVES, STAGE_DIRECTIONS, THEME_TITLES, validate
 
 log = logging.getLogger(__name__)
@@ -71,19 +72,25 @@ def writer(theme: str, cast: list[dict]) -> dict | None:
     def submit_episode(episode_json: str) -> str:
         """Submit the finished episode as a JSON string. Returns ACCEPTED, or the problems to fix."""
         try:
-            ep = json.loads(episode_json)
+            ep = _loads(episode_json)
         except json.JSONDecodeError as e:
-            return f"That is not valid JSON ({e}). Submit the whole episode as one JSON object."
+            accepted["last"] = f"That is not valid JSON ({e}). Submit the whole episode as one JSON object."
+            return accepted["last"]
         problems = validate(ep, ids, theme)
         if problems:
-            return "Fix these problems and submit again:\n- " + "\n- ".join(problems[:12])
+            accepted["last"] = "Fix these problems and submit again:\n- " + "\n- ".join(problems[:12])
+            return accepted["last"]
         accepted["episode"] = ep
         return "ACCEPTED. The story is ready."
 
-    kwargs = {}
-    if guardrail := guardrail_id():
-        kwargs.update(guardrail_id=guardrail, guardrail_version=GUARDRAIL_VERSION)
-    model = BedrockModel(model_id=STORY_MODEL, region_name=AWS_REGION, temperature=0.8, max_tokens=4000, **kwargs)
+    if STORY_MODEL.startswith("ollama:"):
+        model = _ollama_model()
+    else:
+        kwargs = {}
+        if guardrail := guardrail_id():
+            kwargs.update(guardrail_id=guardrail, guardrail_version=GUARDRAIL_VERSION)
+        model = BedrockModel(model_id=STORY_MODEL, region_name=AWS_REGION, temperature=0.8, max_tokens=4000,
+                             **kwargs)
     agent = Agent(model=model, tools=[list_backdrops, list_moves, submit_episode],
                   system_prompt=SYSTEM, callback_handler=None)
     cast_lines = "\n".join(f'- id "{c["id"]}": {c["name"]}' + (f' ({c["description"]})' if c.get("description") else "")
@@ -91,7 +98,23 @@ def writer(theme: str, cast: list[dict]) -> dict | None:
     agent(f"Tonight's theme: {THEME_TITLES[theme]}.\nCast (the child's drawings):\n{cast_lines}\n\n"
           f"Moves: {', '.join(MOVES)}.\nFormat example (ids are placeholders):\n{json.dumps(EXAMPLE)}\n\n"
           "Write tonight's play and submit it.")
+    # Smaller models sometimes stop after the look-ups, or after one rejected draft: nudge them on.
+    for _ in range(3):
+        if "episode" in accepted:
+            break
+        last = accepted.get("last")
+        agent(f"The play is not accepted yet. {last + ' ' if last else ''}"
+              "Call submit_episode now with the whole episode as one JSON string.")
     return accepted.get("episode")
+
+
+def _loads(text: str):
+    """json.loads, forgiving the slips small models make: code fences and trailing commas."""
+    text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return json.loads(re.sub(r",\s*([}\]])", r"\1", text))
 
 
 @functools.cache
@@ -108,9 +131,22 @@ def guardrail_id() -> str:
     return next((g["id"] for g in found if g["name"] == GUARDRAIL_NAME), "")
 
 
+def _ollama_model():
+    """The same agent on a local model (DT_STORY_MODEL=ollama:<name>), for when Bedrock is unreachable.
+
+    Guardrails are a Bedrock feature, so here the validator and the gentle system prompt are the
+    only checks; qwen3's thinking mode is switched off so the story starts straight away.
+    """
+    from strands.models.ollama import OllamaModel
+    return OllamaModel(OLLAMA_HOST, model_id=STORY_MODEL.removeprefix("ollama:"), temperature=0.8,
+                       max_tokens=4000, additional_args={"think": False})
+
+
 def available() -> bool:
-    """Is the AI writer configured? (AWS credentials found and the model not switched off.)"""
+    """Is the AI writer configured? (A local model, or AWS credentials; the model not switched off.)"""
     if STORY_MODEL.lower() == "off":
         return False
+    if STORY_MODEL.startswith("ollama:"):
+        return True
     from ..vision import has_aws
     return has_aws()
