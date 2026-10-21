@@ -46,8 +46,10 @@ flowchart LR
    skeleton, skin weights) by [doodlerig](rig/). A Bedrock
    vision model proposes where the joints are and writes a one-line description. Every proposed
    point is checked against the cut-out mask, and anything implausible falls back to doodlerig's
-   silhouette guess. The parent sees the puppet move on the phone, can drag any joint, names it,
-   and taps *Send to the TV*.
+   silhouette guess. If the photo holds several drawings, the phone shows each one and the child
+   taps the star. The parent sees the puppet move on the phone, can fix the cut-out with an
+   Erase/Add brush (the puppet is rebuilt from the edited mask), drag any joint, name it, and tap
+   *Send to the TV*.
 3. **Perform.** The TV polls for new arrivals; the drawing walks in and waves. Puppets are
    deformed on the TV every frame with `Canvas.drawVertices`, so they move live rather than
    playing a pre-rendered video.
@@ -62,6 +64,8 @@ flowchart LR
   the TV's frame rate (walk, run, jump, wave, dance, cheer, spin, scared, idle).
 - **Phone as the only input device for parents:** QR pairing, no install, joint fixing by drag
   (dots are lettered R/L, not just coloured), a 1-2-3 step bar, light and dark mode.
+- **Pick a drawing, fix the cut-out:** a photo of several drawings shows each one to tap, and an
+  Erase/Add brush with Undo fixes the cut-out before the puppet goes to the TV.
 - **Bedtime stories, steered with the remote:** six themes (Space, Jungle, Under the Sea, Dragon
   Castle, Snowy Mountain, Dinosaur Valley), one choice halfway through, two happy endings.
 - **Read-along:** the spoken word is highlighted; stage directions fire on the word they belong

@@ -37,8 +37,10 @@ family already gathers around at bedtime, with nothing to install and no account
 1. **Add a star.** The TV shows a QR code. A parent scans it (a web page, no app) and
    photographs the drawing.
 2. **Rig.** The photo becomes a puppet: cut-out texture, triangle mesh, 16-joint skeleton, skin
-   weights. The phone shows it moving, and any joint that looks wrong can be dragged into place.
-   Name it, tap *Send to the TV*.
+   weights. If the photo holds several drawings, the phone shows each one and the child taps the
+   star. The phone shows the puppet moving. A missing hand or a bit of leftover paper can be fixed
+   with an Erase/Add brush, and any joint that looks wrong can be dragged into place. Name it,
+   tap *Send to the TV*.
 3. **Perform.** The drawing walks onto the TV and waves. Puppets are deformed every frame with
    `Canvas.drawVertices`, so they move live (walk, run, jump, wave, dance, spin and more) instead
    of playing a pre-rendered video.
@@ -115,7 +117,7 @@ network or a model call fails.
 - A photo of a paper drawing becomes a puppet that moves live on a TV, not a rendered video.
 - The story agent checks its own work with the TV's validator before anything reaches a child.
 - The whole show still runs on a home network with no AWS account and no internet.
-- doodlerig stands on its own as an MIT library with 26 tests.
+- doodlerig stands on its own as an MIT library with 36 passing tests, plus 6 marked as known gaps.
 
 ## What we learned
 
@@ -175,7 +177,12 @@ transparent texture.
   through `joint_provider=`, which is how Doodle Theater adds Bedrock.
 - **Renderer-agnostic:** a WebGL player ships in `rig/web/`; Doodle Theater has a Kotlin one.
 - **Interoperable:** joint names match AnimatedDrawings, with converters both ways.
-- **26 tests:** segmentation against reference masks, joints near hand-made annotations, mesh
+- **Robust cut-out:** shadows across the page are flattened, small gaps in an outline are sealed
+  instead of leaking, and pale crayon is found by colour, not just darkness. Edges are
+  anti-aliased. `find_characters()` returns every drawing on a sheet, and
+  `extract_character(box=...)` cuts out the chosen one.
+- **36 passing tests, plus 6 marked as known gaps:** segmentation against reference masks, synthetic
+  photos with known true shapes (shadows, gaps, pale crayon, two drawings on one sheet), joints near hand-made annotations, mesh
   inside the drawing, normalised weights, every motion, save/load round-trips, and
   JavaScript-vs-Python posing parity.
 - **The leg-following fix:** feet used to be found by splitting the silhouette at its centre
