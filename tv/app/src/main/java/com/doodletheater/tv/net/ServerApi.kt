@@ -81,12 +81,22 @@ class ServerApi(private val context: Context) {
 
     suspend fun deleteEveryone() = withContext(Dispatchers.IO) { text("/api/cast", "DELETE"); Unit }
 
-    /** Download (once) and load a character's rig. Cached on the TV so shows start instantly. */
+    /**
+     * Load a character's rig, cached on the TV. rig.json is small, so it is re-checked every time:
+     * if the laptop rebuilt the puppet (a fixed cut-out, a rigger update) the texture is fetched
+     * again too. When the laptop can't be reached, the cached copy is used.
+     */
     suspend fun rig(member: CastMember): Rig = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "rigs/${member.id}").apply { mkdirs() }
-        for (name in listOf("rig.json", "texture.png")) {
-            val f = File(dir, name)
-            if (!f.exists()) f.writeBytes(bytes("/rigs/${member.id}/$name"))
+        val json = File(dir, "rig.json")
+        val texture = File(dir, "texture.png")
+        val fresh = runCatching { bytes("/rigs/${member.id}/rig.json") }.getOrNull()
+        if (fresh != null && !(json.exists() && json.readBytes().contentEquals(fresh))) {
+            texture.writeBytes(bytes("/rigs/${member.id}/texture.png"))
+            json.writeBytes(fresh)
+        } else if (!json.exists() || !texture.exists()) {
+            json.writeBytes(fresh ?: bytes("/rigs/${member.id}/rig.json"))
+            texture.writeBytes(bytes("/rigs/${member.id}/texture.png"))
         }
         RigStore.fromDir(dir, member.name)
     }
