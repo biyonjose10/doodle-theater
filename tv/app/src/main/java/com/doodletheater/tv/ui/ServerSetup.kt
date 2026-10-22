@@ -79,13 +79,16 @@ fun ServerSetup(api: ServerApi, onDone: () -> Unit) {
         if (port() == 0) { status = "The port can't be 0000 (the server uses 8787)."; return }
         // Saved exactly as normalise() writes it ("0080" -> ":80"), so the wheels show the same address next time.
         val url = ServerConfig.normalise(address()) ?: run { status = "That address doesn't look right."; return }
-        ServerConfig.save(context, url)
         busy = true
         status = "Trying $url…"
         scope.launch {
-            runCatching { api.cast() }
-                .onSuccess { status = "Connected to $url!"; delay(700); onDone() }
-                .onFailure { status = "Can't reach $url. Is the server running, on the same Wi-Fi as this TV?" }
+            // Only an address that answers is saved; a typo never replaces one that works.
+            runCatching { api.cast(at = url) }
+                .onSuccess { ServerConfig.save(context, url); status = "Connected to $url!"; delay(700); onDone() }
+                .onFailure {
+                    status = "Can't reach $url. Is the server running, on the same Wi-Fi as this TV? " +
+                        "Still using ${api.base}."
+                }
             busy = false
         }
     }
@@ -120,10 +123,10 @@ fun ServerSetup(api: ServerApi, onDone: () -> Unit) {
                     TvCard(onClick = {
                         ServerConfig.save(context, null)
                         digits.clear(); digits.addAll(digitsOf(ServerConfig.default) ?: digitsOf("http://10.0.2.2:8787")!!)
-                        status = "Back to the emulator address, ${ServerConfig.default}"
+                        status = "Back to the default address, ${ServerConfig.default}"
                     }, tint = Ink.card, width = 150, height = 44) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Emulator default", fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Ink.ink)
+                            Text("Reset to default", fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Ink.ink)
                         }
                     }
                 }

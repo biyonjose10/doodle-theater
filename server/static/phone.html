@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Doodle Theater</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -247,7 +248,7 @@ import { prepareRig, Stage } from "/static/vendor/doodlerig.js";
 const CODE = "__CODE__";
 const $ = (id) => document.getElementById(id);
 const show = (id) => ["s-start", "s-work", "s-pick", "s-check", "s-done"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
-let draft = null, stage = null, actor = null, motions = null, busy = false, again = false;
+let draft = null, stage = null, actor = null, motions = null, busy = false, again = false, dragging = 0;
 let upload = null;  // {id, candidates} while a photo with several drawings is on the server
 
 if (!CODE) {
@@ -278,7 +279,7 @@ async function loadPreview() {
   await img.decode();
   if (!stage) { stage = new Stage($("preview"), motions); stage.run(); }
   stage.actors.length = 0;
-  actor = stage.add(prepareRig(json, img), { x: 0.5, scale: 0.78, motion: "dance" });
+  actor = stage.add(prepareRig(json, img), { x: 0.5, scale: 0.7, motion: "dance" });
   $("tex").src = img.src;
 }
 
@@ -298,6 +299,7 @@ function placeDots() {
     d.title = name.replace("_", " ");
     d.onpointerdown = (e) => {
       d.setPointerCapture(e.pointerId);
+      dragging++;  // dots are not rebuilt under a finger (see saveJoints)
       const move = (ev) => {
         const r = ed.getBoundingClientRect();
         const fx = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
@@ -309,6 +311,7 @@ function placeDots() {
         d.removeEventListener("pointermove", move);
         d.removeEventListener("pointerup", up);
         d.removeEventListener("pointercancel", up);
+        dragging--;
         await saveJoints();
       };
       d.addEventListener("pointermove", move);
@@ -329,12 +332,15 @@ async function saveJoints() {
       const fresh = await api(`/api/p/${CODE}/draft/${draft.id}/joints`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ joints }),
       });
-      if (again) fresh.joints = draft.joints;  // a newer drag is waiting: keep it and send it next
+      if (again || dragging) fresh.joints = draft.joints;  // a newer drag is waiting or under way: keep it
       draft = fresh;
     } while (again);
     await loadPreview();
-    placeDots();
-  } catch (e) { alert(friendly(e)); } finally { busy = false; }
+    if (!dragging) placeDots();  // mid-drag, the drag's own pointerup saves again and redraws
+  } catch (e) { alert(friendly(e)); again = false; } finally {
+    busy = false;
+    if (again) saveJoints();  // a drag finished while the preview was reloading
+  }
 }
 
 // Spinner with rotating messages while `job` runs; errors go back to the start card.

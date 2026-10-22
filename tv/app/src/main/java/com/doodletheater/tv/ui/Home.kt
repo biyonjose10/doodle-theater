@@ -80,6 +80,9 @@ fun Home(
     var samplesBusy by remember { mutableStateOf(false) }
     val first = remember { FocusRequester() }
     val serverCard = remember { FocusRequester() }
+    val samplesCard = remember { FocusRequester() }
+    var notice by remember { mutableStateOf<String?>(null) }    // a short answer to a press that can't go anywhere
+    LaunchedEffect(notice) { if (notice != null) { delay(4000); notice = null } }
     val scope = rememberCoroutineScope()
 
     suspend fun load() {
@@ -127,11 +130,12 @@ fun Home(
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (offline) "Can't reach the laptop at ${api.base}. Start the server, or set its address."
+                notice ?: if (offline) "Can't reach the laptop at ${api.base}. Start the server, or set its address."
                 else if (storiesLeft == 0) "That's all the stories for tonight. Goodnight! 🌙"
                 else if (cast.isEmpty()) "Draw a character and add them as a star, or try the sample stars!"
                 else "Tonight's stars: ${cast.joinToString(", ") { it.name }}",
-                fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Ink.soft,
+                fontFamily = Baloo, fontWeight = if (notice != null) FontWeight.ExtraBold else FontWeight.Medium,
+                fontSize = if (notice != null) 15.sp else 13.sp, color = if (notice != null) Ink.ink else Ink.soft,
                 modifier = Modifier.weight(1f),
             )
             StoriesChip(limit = storyLimit, left = storiesLeft, onCycle = onCycleLimit)
@@ -149,7 +153,7 @@ fun Home(
                     CardLabel("⚙\nSet server\naddress")
                 }
             } else if (loaded && cast.isEmpty()) item {
-                TvCard(onClick = ::addSamples, tint = Ink.blue) {
+                TvCard(onClick = ::addSamples, tint = Ink.blue, modifier = Modifier.focusRequester(samplesCard)) {
                     CardLabel(if (samplesBusy) "✨\nBuilding\nthe stars…" else "✨\nTry sample\nstars")
                 }
             }
@@ -161,7 +165,8 @@ fun Home(
                         // The drawing sits on its own paper mat, like a sticker on a page.
                         Box(Modifier.weight(1f).fillMaxWidth().background(Ink.paper, RoundedCornerShape(9.dp)).padding(4.dp)) {
                             StarThumb(thumbs[m.id], m.name, failed = m.id in thumbs)
-                            if (focused) TagPill("★ Selected", Modifier.align(Alignment.TopStart), color = Ink.ink.copy(alpha = 0.85f), size = 8)
+                            // OK on a star opens the Dance Party: say so, rather than surprising them.
+                            if (focused) TagPill("OK: dance! 💃", Modifier.align(Alignment.TopStart), color = Ink.ink.copy(alpha = 0.85f), size = 12)
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(m.name, fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Ink.ink, maxLines = 1)
@@ -173,14 +178,31 @@ fun Home(
         RowTitle(if (cast.isEmpty()) "Stories (add a star first)" else "Start tonight's story")
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
             items(THEMES, key = { it.id }) { t ->
-                TvCard(onClick = { if (cast.isNotEmpty() && storiesLeft != 0) onStory(t) }, tint = t.tint, width = 150, height = 100) {
-                    Column(Modifier.fillMaxSize().padding(9.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                        Text(t.emoji, fontSize = 30.sp)
-                        Column {
-                            Text(t.title, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = Color.White,
-                                lineHeight = 16.sp)
-                            Text(t.blurb, fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 10.sp,
-                                color = Color.White.copy(alpha = 0.85f), maxLines = 1)
+                val locked = storiesLeft == 0
+                TvCard(onClick = {
+                    when {
+                        offline -> { notice = "Can't reach the laptop yet. Set its address first."
+                            scope.launch { runCatching { serverCard.requestFocus() } } }
+                        cast.isEmpty() -> { notice = "Add a star first, or try the sample stars!"
+                            scope.launch { runCatching { samplesCard.requestFocus() } } }
+                        locked -> notice = "🔒 That's all the stories for tonight. A grown-up can change it in 👪 Parents."
+                        else -> onStory(t)
+                    }
+                }, tint = t.tint, width = 165, height = 100) {
+                    Box(Modifier.fillMaxSize()) {
+                        Column(Modifier.fillMaxSize().padding(9.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                            Text(t.emoji, fontSize = 30.sp)
+                            Column {
+                                Text(t.title, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = Color.White,
+                                    lineHeight = 16.sp)
+                                Text(t.blurb, fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 12.sp,
+                                    color = Color.White.copy(alpha = 0.85f), maxLines = 1, lineHeight = 14.sp)
+                            }
+                        }
+                        // Stories used up for tonight: the card fades behind a padlock instead of looking open.
+                        if (locked) Box(Modifier.fillMaxSize().background(Ink.paper.copy(alpha = 0.6f)).padding(8.dp),
+                            contentAlignment = Alignment.TopEnd) {
+                            Text("🔒", fontSize = 24.sp)
                         }
                     }
                 }

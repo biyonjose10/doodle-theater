@@ -86,6 +86,7 @@ private sealed interface Phase {
 }
 
 private val LOOPING = setOf("walk", "run", "dance", "wave", "cheer", "scared", "idle")
+private const val WING_GAP = 0.25f                       // space between stars queued offstage
 
 /**
  * Plays an episode: backdrops, puppets, narration with read-along captions, word-timed
@@ -138,27 +139,44 @@ fun StoryPlayer(
     }
 
     // Media session: Fire TV routes "Alexa, pause/resume/next/previous" and the remote's ⏯ ⏮ ⏭ here.
+    val media = remember { arrayOfNulls<MediaSession>(1) }
+
+    /** The one way to pause or resume: the remote's keys and Alexa both come here, so the session never disagrees. */
+    fun setPaused(p: Boolean) {
+        paused = p
+        if (p) narrator.pause() else narrator.resume()
+        media[0]?.setPlaybackState(playbackState(playing = !p))
+    }
+
     DisposableEffect(Unit) {
         val session = MediaSession(context, "DoodleTheater")
-        fun state(playing: Boolean) = session.setPlaybackState(PlaybackState.Builder()
-            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE or
-                PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS)
-            .setState(if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, 0, 1f).build())
         session.setCallback(object : MediaSession.Callback() {
-            override fun onPlay() { paused = false; narrator.resume(); state(true) }
-            override fun onPause() { paused = true; narrator.pause(); state(false) }
-            override fun onStop() { paused = true; narrator.stop(); state(false) }
+            override fun onPlay() = setPaused(false)
+            override fun onPause() = setPaused(true)
+            override fun onStop() { setPaused(true); narrator.stop() }
             override fun onSkipToNext() = pickHandsFree(1)
             override fun onSkipToPrevious() = pickHandsFree(0)
         })
         @Suppress("DEPRECATION")  // Fire OS 6 (API 25) still needs these flags to receive media buttons.
         session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
-        state(true)
+        session.setPlaybackState(playbackState(playing = !paused))
         session.isActive = true
-        onDispose { session.release(); narrator.shutdown() }
+        media[0] = session
+        onDispose { media[0] = null; session.release(); narrator.shutdown() }
     }
 
     fun slotX(i: Int, n: Int) = if (n == 1) 0.5f else 0.2f + i * (0.6f / (n - 1))
+
+    /**
+     * Wait in the wing nearest your slot, queued so whoever walks furthest goes first: entrances then
+     * never cross or bunch up, and nobody's name tag lands on anyone else's.
+     */
+    fun placeInWings() {
+        val n = actors.size
+        val (left, right) = actors.indices.partition { slotX(it, n) <= 0.5f }
+        left.sortedByDescending { slotX(it, n) }.forEachIndexed { q, i -> actors[i].x = -0.2f - q * WING_GAP }
+        right.sortedBy { slotX(it, n) }.forEachIndexed { q, i -> actors[i].x = 1.2f + q * WING_GAP }
+    }
 
     fun perform(a: Action, now: Double) {
         val actor = byId[a.who] ?: return
@@ -168,10 +186,7 @@ fun StoryPlayer(
             a.act == "enter" -> if (actor.offstage) actor.walkTo(home, now, arrive = "wave")
             a.act == "exit" -> actor.walkTo(if (actor.x < 0.5f) -0.25f else 1.25f, now)
             actor.offstage -> actor.walkTo(home, now, arrive = a.act)
-            a.act == "walk" || a.act == "run" -> {
-                val to = (home + if (actor.x <= home) 0.08f else -0.08f).coerceIn(0.12f, 0.88f)
-                actor.walkTo(to, now, run = a.act == "run")
-            }
+            // Walking and running happen on the spot: stepping out of the slot is what made neighbours overlap.
             a.act in LOOPING -> actor.playFor(a.act, now, 2.4)
             else -> actor.play(a.act, now)
         }
@@ -213,8 +228,9 @@ fun StoryPlayer(
                 words++
                 highlight = s to e
                 val w = b.text.substring(s, e).lowercase().trim { !it.isLetter() && it != '\'' }
-                val hit = pending.firstOrNull { it.atWord!!.lowercase() == w }
-                if (hit != null) { pending.remove(hit); perform(hit, clock[0]) }
+                // Every direction cued on this word, e.g. "everyone dances on 'swayed'", not just the first.
+                val hits = pending.filter { it.atWord!!.lowercase() == w }
+                if (hits.isNotEmpty()) { pending.removeAll(hits); hits.forEach { perform(it, clock[0]) } }
             }
             // No Polly clip, or it couldn't be fetched (laptop asleep, missing mp3): the TV's own voice reads it.
             if (b.audio == null || !narrator.play(api.url(b.audio), b.marks, onWord))
@@ -232,19 +248,22 @@ fun StoryPlayer(
         val ep = episode ?: runCatching {
             Episode.parse(api.json("/api/story", "POST",
                 JSONObject().put("theme", theme.id).put("bedtime", bedtime)).toString())
-        }.getOrElse { phase = Phase.Failed("Couldn't write a story: ${it.message}"); return@LaunchedEffect }
+        }.getOrElse {
+            android.util.Log.w("DoodleStory", "couldn't get a story", it)
+            phase = Phase.Failed("The story machine is napping. Let's try again!"); return@LaunchedEffect
+        }
         onStoryStart()
         night.snapTo(0f)
         if (episode == null) {
             phase = Phase.Loading("Calling the stars to the stage…")
-            ep.cast.forEachIndexed { i, s ->
+            ep.cast.forEachIndexed { _, s ->
                 val rig = runCatching { api.rig(CastMember(s.id, s.name, "")) }.getOrNull() ?: return@forEachIndexed
                 val a = Actor(rig, motions).apply {
                     label = s.name; heightFraction = if (ep.cast.size > 2) 0.34f else 0.4f; feetY = 0.86f
-                    x = if (i % 2 == 0) -0.2f else 1.2f
                 }
                 actors.add(a); byId[s.id] = a
             }
+            placeInWings()
             for (sc in ep.scenes.values) {
                 if (sc.backdrop !in backdrops) runCatching { api.image("/static/backdrops/${sc.backdrop}.jpg") }
                     .onSuccess { backdrops[sc.backdrop] = it }
@@ -252,7 +271,8 @@ fun StoryPlayer(
             narrator.init()
             episode = ep
         } else {
-            actors.forEachIndexed { i, a -> a.x = if (i % 2 == 0) -0.2f else 1.2f; a.play("idle", clock[0]) }
+            placeInWings()
+            actors.forEach { it.play("idle", clock[0]) }
         }
         phase = Phase.Title
         backdrop = ep.scenes.getValue("start").backdrop
@@ -307,8 +327,10 @@ fun StoryPlayer(
         Modifier.fillMaxSize().background(Ink.paper).focusRequester(keys).focusable()
             .onPreviewKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                if (e.key == Key.MediaPlayPause || e.key == Key.MediaPause || e.key == Key.MediaPlay) {
-                    paused = !paused; if (paused) narrator.pause() else narrator.resume(); return@onPreviewKeyEvent true
+                when (e.key) {
+                    Key.MediaPlayPause -> { setPaused(!paused); return@onPreviewKeyEvent true }
+                    Key.MediaPlay -> { setPaused(false); return@onPreviewKeyEvent true }
+                    Key.MediaPause -> { setPaused(true); return@onPreviewKeyEvent true }
                 }
                 if (e.key == Key.MediaNext || e.key == Key.MediaPrevious) {
                     pickHandsFree(if (e.key == Key.MediaNext) 1 else 0); return@onPreviewKeyEvent true
@@ -354,30 +376,38 @@ fun StoryPlayer(
         }
 
         when (val p = phase) {
-            is Phase.Loading -> Banner(p.message, "Dance while you wait!")
+            is Phase.Loading -> Banner(p.message, "This takes a few seconds")
             is Phase.Failed -> Banner(p.message, "Press Back to go home")
-            Phase.Title -> episode?.let { Banner(it.title, theme.title) }
+            // "Professor Noodles Under the Sea" doesn't need "Under the Sea" again underneath.
+            Phase.Title -> episode?.let { Banner(it.title, theme.title.takeUnless { t -> it.title.contains(t, ignoreCase = true) }) }
             is Phase.Choosing -> ChoiceCards(p.choice, firstOption, secondOption, voicePick) { picked[0]?.complete(it) }
             Phase.Ended -> GoodnightCard(episode?.cast?.map { it.name }.orEmpty(), firstOption,
-                onAgain = { run++ }, onHome = onHome, allowWatchAgain = allowWatchAgain())
+                onAgain = { setPaused(false); run++ }, onHome = onHome, allowWatchAgain = allowWatchAgain())
             Phase.Playing, Phase.WindDown -> {}
         }
-        AnimatedVisibility(paused, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
-            Text("⏸  Paused", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, color = Color.White,
-                modifier = Modifier.background(Color(0xAA000000), RoundedCornerShape(20.dp)).padding(horizontal = 30.dp, vertical = 10.dp))
+        // A corner badge, clear of the caption and the puppets' name tags; nothing to pause once it's over.
+        AnimatedVisibility(paused && phase != Phase.Ended && phase !is Phase.Failed, enter = fadeIn(), exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = 24.dp)) {
+            Text("⏸  Paused", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = Color.White,
+                modifier = Modifier.background(Color(0xAA000000), RoundedCornerShape(16.dp)).padding(horizontal = 18.dp, vertical = 6.dp))
         }
     }
 }
 
+private fun playbackState(playing: Boolean): PlaybackState = PlaybackState.Builder()
+    .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE or
+        PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+    .setState(if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, 0, 1f).build()
+
 @Composable
-private fun Banner(title: String, subtitle: String) {
+private fun Banner(title: String, subtitle: String?) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             Modifier.background(Color(0xEEFFFBF0), RoundedCornerShape(26.dp)).padding(horizontal = 40.dp, vertical = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(title, fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, color = Ink.ink, textAlign = TextAlign.Center)
-            Text(subtitle, fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = Ink.soft)
+            subtitle?.let { Text(it, fontFamily = Baloo, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = Ink.soft) }
         }
     }
 }

@@ -29,8 +29,8 @@ class ServerApi(private val context: Context) {
     /** Read on every call, so a new address from the "Set server address" screen takes effect at once. */
     val base: String get() = ServerConfig.url(context)
 
-    private fun open(path: String, method: String = "GET", body: String? = null): HttpURLConnection {
-        val c = URL(base + path).openConnection() as HttpURLConnection
+    private fun open(path: String, method: String = "GET", body: String? = null, at: String = base): HttpURLConnection {
+        val c = URL(at + path).openConnection() as HttpURLConnection
         c.requestMethod = method
         c.connectTimeout = 4000
         c.readTimeout = 60000
@@ -46,8 +46,8 @@ class ServerApi(private val context: Context) {
         return c
     }
 
-    private fun text(path: String, method: String = "GET", body: String? = null) =
-        open(path, method, body).inputStream.bufferedReader().use { it.readText() }
+    private fun text(path: String, method: String = "GET", body: String? = null, at: String = base) =
+        open(path, method, body, at).inputStream.bufferedReader().use { it.readText() }
 
     private fun bytes(path: String) = open(path).inputStream.use { it.readBytes() }
 
@@ -66,8 +66,9 @@ class ServerApi(private val context: Context) {
             .map { it.getInt("n") to member(it) }
     }
 
-    suspend fun cast(): List<CastMember> = withContext(Dispatchers.IO) {
-        val arr: JSONArray = JSONObject(text("/api/cast")).getJSONArray("cast")
+    /** The laptop's stars; [at] asks a server other than the saved one (to test an address before saving it). */
+    suspend fun cast(at: String = base): List<CastMember> = withContext(Dispatchers.IO) {
+        val arr: JSONArray = JSONObject(text("/api/cast", at = at)).getJSONArray("cast")
         (0 until arr.length()).map { member(arr.getJSONObject(it)) }
     }
 
@@ -142,7 +143,10 @@ class ServerApi(private val context: Context) {
 
     /** Each star's drawing, fetched one by one: a drawing that fails maps to null, and the rest still load. */
     suspend fun thumbnails(members: List<CastMember>): Map<String, ImageBitmap?> =
-        members.associate { m -> m.id to runCatching { image("/rigs/${m.id}/texture.png") }.getOrNull() }
+        members.associate { m ->
+            m.id to runCatching { image("/rigs/${m.id}/texture.png") }
+                .onFailure { android.util.Log.w("DoodleApi", "no thumbnail for ${m.id}: $it") }.getOrNull()
+        }
 
     suspend fun json(path: String, method: String = "GET", body: JSONObject? = null): JSONObject =
         withContext(Dispatchers.IO) { JSONObject(text(path, method, body?.toString())) }

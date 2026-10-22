@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -95,6 +97,9 @@ fun AddStar(api: ServerApi) {
     val paint = remember { labelPaint(context) }
     val scope = rememberCoroutineScope()
     var samplesBusy by remember { mutableStateOf(false) }
+    val samplesButton = remember { FocusRequester() }
+    // The only button here: start on it, so OK does something and the focus outline shows where we are.
+    LaunchedEffect(Unit) { runCatching { delay(100); samplesButton.requestFocus() } }
 
     /** A new star walks in from the wings into the spotlight and waves. */
     suspend fun arrive(member: CastMember) {
@@ -190,7 +195,7 @@ fun AddStar(api: ServerApi) {
                 Step("✨", "Watch it walk in!")
             }
             Spacer(Modifier.height(14.dp))
-            TvCard(onClick = ::useSamples, tint = Ink.card, width = 250, height = 40) {
+            TvCard(onClick = ::useSamples, tint = Ink.card, width = 250, height = 40, modifier = Modifier.focusRequester(samplesButton)) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(if (samplesBusy) "Building the sample stars…" else "No drawing? Use sample stars",
                         fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Ink.ink)
