@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import pytest
 
-from doodlerig import NAMES, Rig, build_rig
+from doodlerig import NAMES, Rig, build_rig, rig_from_mask
 from doodlerig.joints import from_animated_drawings, heuristic_joints, snap_inside, to_animated_drawings, validate
 from doodlerig.mesh import build_mesh
 from doodlerig.pose import motions, sample, skin, skin_matrices
@@ -220,3 +220,17 @@ def test_raised_arm_leaves_a_fat_body_flank_behind():
     hands = [int(np.argmin(np.linalg.norm(v - np.array(joints[h]), axis=1))) for h in ("right_hand", "left_hand")]
     assert drift[hands].min() > 60                                           # the arms really do go up
     assert drift[flank].max() < 0.1 * drift[hands].min(), (drift[flank].max(), drift[hands].min())
+
+
+def test_a_skeleton_with_only_one_bone_still_saves_two_influences(tmp_path):
+    """Everything on the root but the neck: one bone, so one driver, which used to give Nx1 weights."""
+    mask = np.zeros((120, 80), np.uint8)
+    mask[10:110, 20:60] = 255
+    crop = np.full((*mask.shape, 3), 255, np.uint8)
+    joints = {n: (40.0, 80.0) for n in NAMES}
+    joints["neck"] = (40.0, 30.0)
+    rig = rig_from_mask(crop, mask, joints)
+    assert rig.bone_index.shape == rig.bone_weight.shape == (len(rig.vertices), 2)
+    np.testing.assert_allclose(rig.bone_weight.sum(axis=1), 1.0, atol=1e-5)
+    back = Rig.load(rig.save(tmp_path))
+    assert back.bone_index.shape == (len(rig.vertices), 2)

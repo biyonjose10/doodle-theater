@@ -11,7 +11,9 @@ import numpy as np
 import pytest
 
 from doodlerig import build_rig, rig_from_mask
-from doodlerig.segment import extract_character, find_characters, soft_alpha, straighten
+from PIL import Image
+
+from doodlerig.segment import extract_character, find_characters, find_paper, load_image, soft_alpha, straighten
 
 FIX = Path(__file__).parent / "fixtures"
 PAPER = np.array([246, 244, 238], np.float32)
@@ -288,3 +290,52 @@ def test_build_rig_accepts_a_box():
 @pytest.mark.parametrize("photo", ["garlic.png", "char6_image.png"])
 def test_find_characters_sees_one_drawing_on_the_fixture_photos(photo):
     assert len(find_characters(FIX / photo)) == 1
+
+
+def _modes() -> dict[str, Image.Image]:
+    """A white 40x40 picture with a dark square, in every image mode a phone or scanner might send."""
+    grey = np.full((40, 40), 255, np.uint8)
+    grey[10:20, 10:20] = 0
+    rgb = np.dstack([grey] * 3)
+    rgb[25:35, 25:35] = (220, 30, 30)                       # and a red square, for colour modes
+    opaque = np.where(grey == 0, 255, 0).astype(np.uint8)   # only the dark square is opaque
+    p = Image.fromarray(grey, "L").convert("P")
+    p.info["transparency"] = int(np.asarray(p)[0, 0])      # the white index is see-through
+    pa = Image.fromarray(np.zeros_like(grey), "L").convert("P").convert("PA")
+    pa.putalpha(Image.fromarray(opaque, "L"))
+    return {
+        "L": Image.fromarray(grey, "L"),
+        "1": Image.fromarray(grey, "L").convert("1"),
+        "I;16": Image.fromarray(grey.astype(np.uint16) * 257),
+        "I": Image.fromarray(grey.astype(np.int32) * 257),
+        "F": Image.fromarray(grey.astype(np.float32)),
+        "CMYK": Image.fromarray(rgb, "RGB").convert("CMYK"),
+        "LA": Image.fromarray(np.dstack([np.zeros_like(grey), opaque]), "LA"),
+        "PA": pa,
+        "P": p,
+        "RGBA": Image.fromarray(np.dstack([np.zeros_like(rgb), opaque]), "RGBA"),
+    }
+
+
+@pytest.mark.parametrize("mode", list(_modes()))
+def test_load_image_reads_every_mode_as_rgb_on_white(mode):
+    im = _modes()[mode]
+    assert im.mode == mode
+    img = load_image(im)
+    assert img.shape == (40, 40, 3) and img.dtype == np.uint8
+    assert img[15, 15].max() < 40, img[15, 15]              # the dark square stays dark
+    assert img[2, 2].min() > 215, img[2, 2]                 # the paper (or transparency) is white
+    if mode == "CMYK":                                      # K is ink, not alpha: red stays red
+        r, g, b = img[30, 30].astype(int)
+        assert r > 180 and g < 90 and b < 90, img[30, 30]
+
+
+@pytest.mark.parametrize("shape", [(3000, 20), (20, 3000)])
+def test_a_very_narrow_sheet_does_not_crash(shape):
+    """A thin strip of paper on a table: trimming 3% of its LONG side used to turn the box inside out."""
+    img = np.full((*shape, 3), TABLE, np.uint8)
+    h, w = shape
+    img[h // 10:h - h // 10, w // 10:w - w // 10] = PAPER
+    box = find_paper(img)
+    assert box is None or (box[0] < box[2] and box[1] < box[3])
+    find_characters(img)

@@ -5,7 +5,8 @@ TV reads `audio` + `marks` when present and falls back to its own TTS when they 
 
 Bedtime episodes are read slower and softer through SSML <prosody> (neural voices support
 `rate` and `volume`, not `pitch`). Polly then reports speech-mark offsets into the SSML string,
-so they are mapped back to character indices into the beat's plain text, which the TV highlights.
+so they are mapped back to positions in the beat's plain text, which the TV highlights. Those
+positions count UTF-16 units, as Kotlin strings do, so an emoji (two units) doesn't shift the rest.
 """
 from __future__ import annotations
 
@@ -45,15 +46,18 @@ def polly_input(text: str, bedtime: bool) -> tuple[str, list[int]]:
     return "".join(parts), starts
 
 
-def to_char_marks(raw: list[dict], starts: list[int]) -> list[dict]:
-    """Polly word marks (byte offsets into what was sent) -> {time, start, end} as plain-text char indices."""
+def to_char_marks(raw: list[dict], starts: list[int], text: str) -> list[dict]:
+    """Polly word marks (byte offsets into what was sent) -> {time, start, end} as UTF-16 offsets into `text`."""
     n = len(starts) - 1
+    u16 = [0]
+    for ch in text:
+        u16.append(u16[-1] + (2 if ord(ch) > 0xFFFF else 1))
     marks = []
     for m in raw:
         # start: the character whose bytes contain m["start"]; end: first character starting at/after m["end"].
         start = min(max(bisect.bisect_right(starts, m["start"]) - 1, 0), n)
         end = min(max(bisect.bisect_left(starts, m["end"]), start), n)
-        marks.append({"time": m["time"], "start": start, "end": end})
+        marks.append({"time": m["time"], "start": u16[start], "end": u16[end]})
     return marks
 
 
@@ -84,7 +88,7 @@ def narrate(ep: dict, media_dir: Path) -> dict:
                 raw = [json.loads(line) for line in marks_raw["AudioStream"].read().decode("utf-8").splitlines()
                        if line.strip()]
                 beat["audio"] = f"/media/{ep['id']}/{name}"
-                beat["marks"] = to_char_marks(raw, starts)
+                beat["marks"] = to_char_marks(raw, starts, beat["text"])
         ep["voice"] = "polly"
     except Exception as e:
         log.warning("Polly narration failed, the TV will use its own voice: %s", e)

@@ -10,10 +10,11 @@
   :root {
     --paper: #fff8e7; --paper2: #f5e6c8; --ink: #2b2b3a; --soft: #6b6577; --accent: #d65434;
     --blue: #5b7bd5; --card: #ffffff; --line: #e8dcc0; --ok: #3d9a5b;
+    --link: #4060c0; --warn: #b8401f;  /* text colours: 4.5:1 on the cards */
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) { --paper: #1d1b22; --paper2: #26232d; --ink: #f2eee6; --soft: #b5aec2;
-      --card: #2c2934; --line: #3b3745; }
+      --card: #2c2934; --line: #3b3745; --link: #9db0f0; --warn: #ff8a6a; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100svh; background: linear-gradient(var(--paper), var(--paper2));
@@ -82,7 +83,7 @@
     padding: 12px 16px; border-radius: 16px; border: 2px solid var(--line); background: var(--paper); color: var(--ink); }
   input[type=text]::placeholder { color: var(--soft); opacity: .7; }
   input[type=text]:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 35%, transparent); }
-  details summary { cursor: pointer; font-weight: 700; color: var(--blue); list-style: none;
+  details summary { cursor: pointer; font-weight: 700; color: var(--link); list-style: none;
     display: flex; align-items: center; gap: 8px; min-height: 48px; margin: -6px 0; }
   details summary::-webkit-details-marker { display: none; }
   details summary::before { content: "▸"; display: inline-block; transition: transform .15s; }
@@ -108,7 +109,7 @@
   .kv { white-space: nowrap; }
   .key.r { background: #d63c3c; } .key.l { background: #3c5fd6; }
   .key.c { background: #333; } .key.c::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
-  .error { color: var(--accent); font-weight: 700; margin: 12px 0 0; }
+  .error { color: var(--warn); font-weight: 700; margin: 12px 0 0; }
   .done { text-align: center; }
   .done .tick { font-size: 64px; color: var(--ok); line-height: 1; margin-top: 4px; }
   .done h2 { margin: 6px 0 16px; line-height: 1.2; }
@@ -117,7 +118,6 @@
     .big { font-size: 19px; padding: 10px 12px; }
     .steps li { font-size: 14px; gap: 5px; }
   }
-  .meta { font-size: 13px; color: var(--soft); text-align: right; }
 
   /* Pick your character: a grid of big tappable thumbnails */
   .pick-title { margin: 0 0 2px; font-size: 24px; line-height: 1.2; }
@@ -127,11 +127,11 @@
     box-shadow: 0 3px 0 var(--line); transition: transform .12s ease, border-color .12s ease; }
   .cand img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .cand .n { position: absolute; top: 6px; left: 6px; width: 28px; height: 28px; border-radius: 50%;
-    display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 700; font-size: 15px; }
+    display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 15px/1 "Baloo 2", system-ui, sans-serif; }
   .cand:active { transform: scale(.96); border-color: var(--accent); }
   .cand:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
   .link { display: block; margin: 10px auto 0; min-height: 48px; padding: 0 12px; border: 0; background: none;
-    color: var(--blue); font: 700 17px/1.2 "Baloo 2", system-ui, sans-serif; cursor: pointer; }
+    color: var(--link); font: 700 17px/1.2 "Baloo 2", system-ui, sans-serif; cursor: pointer; }
 
   /* Fix the cut-out: paint on the mask */
   .tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
@@ -172,7 +172,7 @@
       <li>Arms out, legs apart</li>
       <li>Straight from above, good light</li>
     </ul>
-    <p class="error hidden" id="err"></p>
+    <p class="error hidden" id="err" role="alert"></p>
   </section>
 
   <section id="s-work" class="card hidden">
@@ -191,12 +191,11 @@
     <div class="card">
       <canvas id="preview"></canvas>
       <p class="desc" id="desc"></p>
-      <p class="meta" id="meta"></p>
       <button class="link hidden" id="repick">↩ Pick a different drawing</button>
     </div>
     <div class="card">
       <details id="cut">
-        <summary>Bits missing or extra? Fix the cut-out</summary>
+        <summary>Bits missing or extra? Fix the cut&#8209;out</summary>
         <p class="legend">Rub out extra paper with <b>Erase</b>. Paint back missing bits with <b>Add</b>.</p>
         <div class="tools">
           <div class="seg" role="group" aria-label="Brush">
@@ -228,7 +227,8 @@
     </div>
     <div class="card">
       <label for="name">What's their name?</label>
-      <input id="name" type="text" maxlength="24" placeholder="Captain Blob" autocomplete="off">
+      <input id="name" type="text" maxlength="24" placeholder="e.g. Captain Blob" autocomplete="off">
+      <p class="error hidden" id="name-err" role="alert">Give your star a name first.</p>
       <div style="height:16px"></div>
       <button class="big" id="send">✨ Send to the TV</button>
     </div>
@@ -247,20 +247,27 @@ import { prepareRig, Stage } from "/static/vendor/doodlerig.js";
 const CODE = "__CODE__";
 const $ = (id) => document.getElementById(id);
 const show = (id) => ["s-start", "s-work", "s-pick", "s-check", "s-done"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
-let draft = null, stage = null, actor = null, motions = null, busy = false;
+let draft = null, stage = null, actor = null, motions = null, busy = false, again = false;
 let upload = null;  // {id, candidates} while a photo with several drawings is on the server
 
 if (!CODE) {
-  $("sub").textContent = "This link has expired. Choose “Add a star” on the TV and scan the new code.";
+  $("err").textContent = "This link has expired. Choose “Add a star” on the TV and scan the new code.";
+  $("err").classList.remove("hidden");
+  document.querySelector(".tips").classList.add("hidden");
   $("pick").disabled = true;
 }
 
+class Oops extends Error {}  // a message meant for the parent
 async function api(path, opts = {}) {
-  const r = await fetch(path, opts);
+  let r;
+  try { r = await fetch(path, opts); } catch {
+    throw new Oops("Can't reach the laptop. Is the phone on the same Wi-Fi?");
+  }
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `Something went wrong (${r.status})`);
+  if (!r.ok) throw new Oops(body.error || `Something went wrong (${r.status}). Please try again.`);
   return body;
 }
+const friendly = (e) => (e instanceof Oops ? e.message : "Something went wrong. Please try again.");
 
 async function loadPreview() {
   motions ??= (await api("/motions.json")).motions;
@@ -301,26 +308,33 @@ function placeDots() {
       const up = async () => {
         d.removeEventListener("pointermove", move);
         d.removeEventListener("pointerup", up);
+        d.removeEventListener("pointercancel", up);
         await saveJoints();
       };
       d.addEventListener("pointermove", move);
       d.addEventListener("pointerup", up);
+      d.addEventListener("pointercancel", up);
     };
     ed.append(d);
   }
 }
 
 async function saveJoints() {
-  if (busy) return;
+  if (busy) { again = true; return; }
   busy = true;
   try {
-    const joints = { ...draft.joints, hip: draft.joints.root };
-    draft = await api(`/api/p/${CODE}/draft/${draft.id}/joints`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ joints }),
-    });
+    do {
+      again = false;
+      const joints = { ...draft.joints, hip: draft.joints.root };
+      const fresh = await api(`/api/p/${CODE}/draft/${draft.id}/joints`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ joints }),
+      });
+      if (again) fresh.joints = draft.joints;  // a newer drag is waiting: keep it and send it next
+      draft = fresh;
+    } while (again);
     await loadPreview();
     placeDots();
-  } catch (e) { alert(e.message); } finally { busy = false; }
+  } catch (e) { alert(friendly(e)); } finally { busy = false; }
 }
 
 // Spinner with rotating messages while `job` runs; errors go back to the start card.
@@ -331,7 +345,7 @@ async function working(msgs, job) {
   let i = 0;
   const tick = setInterval(() => ($("work-msg").textContent = msgs[++i % msgs.length]), 1600);
   try { await job(); } catch (e) {
-    $("err").textContent = e.message;
+    $("err").textContent = friendly(e);
     $("err").classList.remove("hidden");
     show("s-start");
   } finally { clearInterval(tick); }
@@ -342,11 +356,10 @@ const CUTTING = ["Cutting out the drawing…", "Finding elbows and knees…", "T
 async function showDraft(d) {
   draft = d;
   brushFor = null;
-  $("cut").open = false;
+  $("cut").open = $("fix").open = false;
   await loadPreview();
   placeDots();
   $("desc").textContent = draft.description;
-  $("meta").textContent = `ready in ${draft.seconds}s · joints by ${draft.joints_from}`;
   $("repick").classList.toggle("hidden", !upload);
   show("s-check");
   // On a phone, focusing would pop the keyboard over the puppet the parent should be looking at.
@@ -378,13 +391,26 @@ function showPicker() {
   show("s-pick");
 }
 
+// Long side capped at 2400 px as a JPEG: plenty for the rigger, and quick over Wi-Fi.
+async function shrink(file, max = 2400) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    if (k === 1 && file.size < 4e6) return file;
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return (await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.9))) || file;
+  } catch { return file; }  // not an image the browser can read: let the server say so
+}
+
 $("pick").onclick = () => $("file").click();
 $("file").onchange = async () => {
   const f = $("file").files[0];
   if (!f) return;
   await working(["Looking for drawings…", ...CUTTING], async () => {
     const form = new FormData();
-    form.append("file", f);
+    form.append("file", await shrink(f));
     const found = await api(`/api/p/${CODE}/candidates`, { method: "POST", body: form });
     upload = found.upload ? { id: found.upload, candidates: found.candidates } : null;
     if (found.draft) await showDraft(found.draft);
@@ -392,7 +418,7 @@ $("file").onchange = async () => {
   });
   $("file").value = "";
 };
-$("retake").onclick = () => { upload = null; $("file").click(); };
+$("retake").onclick = () => $("file").click();  // `upload` is replaced only when a new photo arrives
 $("repick").onclick = () => { if (upload) showPicker(); };
 
 // Fix the cut-out: the child paints on the mask (white = keep), then the server rebuilds the rig.
@@ -404,11 +430,13 @@ let cropImg = null, brushFor = null, mode = "erase", size = 0.06, undoStack = []
 
 async function loadBrush() {
   if (brushFor === draft.id) return;
+  const forId = draft.id;
   const bust = `?v=${Date.now()}`;
   const [crop, mask] = [new Image(), new Image()];
   crop.src = `/api/p/${CODE}/draft/${draft.id}/crop.png${bust}`;
   mask.src = `/api/p/${CODE}/draft/${draft.id}/mask.png${bust}`;
   await Promise.all([crop.decode(), mask.decode()]);
+  if (draft?.id !== forId) return;  // a different drawing was picked meanwhile
   const w = crop.naturalWidth, h = crop.naturalHeight;
   for (const c of [brush, maskC, keptC, edgeC]) { c.width = w; c.height = h; }
   mctx.drawImage(mask, 0, 0);
@@ -493,7 +521,7 @@ brush.onpointermove = (e) => {
 };
 brush.onpointerup = brush.onpointercancel = (e) => { if (drawing?.id === e.pointerId) drawing = null; };
 
-$("cut").ontoggle = () => { if ($("cut").open) loadBrush().catch((e) => alert(e.message)); };
+$("cut").ontoggle = () => { if ($("cut").open) loadBrush().catch((e) => alert(friendly(e))); };
 $("b-erase").onclick = () => { mode = "erase"; syncButtons(); };
 $("b-add").onclick = () => { mode = "add"; syncButtons(); };
 document.querySelectorAll(".tool.size").forEach((b) => (b.onclick = () => { size = +b.dataset.size; syncButtons(); }));
@@ -521,12 +549,12 @@ $("cut-done").onclick = async () => {
     draft = await api(`/api/p/${CODE}/draft/${id}/mask`, { method: "POST", body: form });
     await loadPreview();
     placeDots();
-    $("meta").textContent = `cut-out fixed in ${draft.seconds}s · joints by ${draft.joints_from}`;
     brushFor = null;
     $("cut").open = false;
     $("preview").scrollIntoView({ behavior: "smooth", block: "center" });
-  } catch (e) { alert(e.message); } finally {
+  } catch (e) { alert(friendly(e)); } finally {
     busy = false;
+    again = false;  // the rebuilt puppet has new joints; a drag made meanwhile is dropped
     $("cut-done").textContent = "✓ Done";
     syncButtons();
   }
@@ -534,7 +562,8 @@ $("cut-done").onclick = async () => {
 
 $("send").onclick = async () => {
   const name = $("name").value.trim();
-  if (!name) { $("name").focus(); return; }
+  if (!name) { $("name-err").classList.remove("hidden"); $("name").focus(); return; }
+  if (busy) { alert("One moment: the puppet is still being updated."); return; }
   $("send").disabled = true;
   try {
     await api(`/api/p/${CODE}/draft/${draft.id}/send`, {
@@ -542,9 +571,10 @@ $("send").onclick = async () => {
     });
     $("done-msg").textContent = `${name} is on the TV now!`;
     show("s-done");
-  } catch (e) { alert(e.message); } finally { $("send").disabled = false; }
+  } catch (e) { alert(friendly(e)); } finally { $("send").disabled = false; }
 };
 
+$("name").oninput = () => $("name-err").classList.add("hidden");
 $("again").onclick = () => { $("name").value = ""; draft = null; upload = null; show("s-start"); };
 </script>
 </body>

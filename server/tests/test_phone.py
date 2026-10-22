@@ -232,3 +232,104 @@ def test_a_transparent_mask_png_works_too(draft):
     r = client.post(f"/api/p/{code}/draft/{d['id']}/mask",
                     files={"file": ("m.png", _png(Image.fromarray(rgba, "RGBA")))})
     assert r.status_code == 200 and r.json()["width"] == d["width"]
+
+
+# --- Bad input gets a message, never a 500 ------------------------------------------------------
+
+def test_grey_and_one_bit_photos_are_rigged(phone):
+    client, code, _ = phone
+    grey = Image.open(io.BytesIO(_one_drawing())).convert("L")
+    for im in (grey, grey.point(lambda v: 255 if v > 200 else 0).convert("1")):
+        r = _photo(client, code, _png(im))
+        assert r.status_code == 200, r.text
+        assert r.json()["draft"]["id"]
+
+
+def test_a_tiny_file_that_decodes_huge_is_refused_unread(phone, monkeypatch):
+    client, code, _ = phone
+    bomb = _png(Image.new("L", (7000, 7000)))           # ~50 KB on the wire, 49 megapixels decoded
+    assert len(bomb) < 1024 * 1024
+    loads = []
+    monkeypatch.setattr(Image.Image, "load", lambda self, *a: loads.append(self.size))
+    for url in (f"/api/p/{code}/candidates", f"/api/p/{code}/photo"):
+        r = client.post(url, files={"file": ("bomb.png", bomb)})
+        assert r.status_code == 422 and "too big" in r.json()["error"]
+    assert (7000, 7000) not in loads                     # never decoded
+
+
+def test_a_wrong_size_mask_is_refused_before_it_is_decoded(draft, monkeypatch):
+    client, code, _, d = draft
+    small = _mask(client, code, d["id"])[:-10]
+    png, real_load = _png(Image.fromarray(small)), Image.Image.load
+
+    def load(self, *a):
+        assert self.size != small.shape[::-1], "decoded a mask it was about to refuse"
+        return real_load(self, *a)
+
+    monkeypatch.setattr(Image.Image, "load", load)
+    wrong = client.post(f"/api/p/{code}/draft/{d['id']}/mask", files={"file": ("mask.png", png)})
+    assert wrong.status_code == 422 and "expected" in wrong.json()["error"]
+
+
+def test_uploads_are_read_only_up_to_the_limit(phone, monkeypatch):
+    client, code, _ = phone
+    from starlette.datastructures import UploadFile
+    real_read, sizes = UploadFile.read, []
+
+    async def read(self, size=-1):
+        sizes.append(size)
+        return await real_read(self, size)
+
+    monkeypatch.setattr(UploadFile, "read", read)
+    monkeypatch.setattr(app_module, "MAX_PHOTO", 1000)
+    r = _photo(client, code, b"x" * 5000)
+    assert r.status_code == 413 and "too big" in r.json()["error"]
+    assert sizes == [1001]
+
+
+@pytest.mark.parametrize("shape", [(3000, 20), (20, 3000)])
+def test_a_very_narrow_photo_gets_a_message(phone, shape):
+    client, code, _ = phone
+    img = np.full((*shape, 3), (150, 108, 72), np.uint8)
+    h, w = shape
+    img[h // 10:h - h // 10, w // 10:w - w // 10] = 246
+    r = _photo(client, code, _png(Image.fromarray(img)))
+    assert r.status_code in (200, 422), r.text
+    if r.status_code == 422:
+        assert r.json()["error"]
+
+
+def test_a_segmentation_crash_is_a_message_not_a_500(phone, monkeypatch):
+    client, code, _ = phone
+
+    def boom(*a, **k):
+        raise IndexError("deep inside OpenCV")
+
+    monkeypatch.setattr(pipeline, "find_characters", boom)
+    monkeypatch.setattr(pipeline, "extract_character", boom)
+    for url in (f"/api/p/{code}/candidates", f"/api/p/{code}/photo"):
+        r = client.post(url, files={"file": ("p.png", _one_drawing())})
+        assert r.status_code == 422 and "drawing" in r.json()["error"]
+
+
+@pytest.mark.parametrize("root", [
+    None,                    # no root (nor hip)
+    "[X]",                   # not a pair
+    "[X, Y, 30]",
+    "[Infinity, Y]",
+    "[NaN, Y]",
+    "[X, 1e400]",            # overflows to inf
+    '["left", Y]',
+])
+def test_malformed_joints_get_a_message(draft, root):
+    """The draft's own joints, which rebuild fine, with only the root spoilt."""
+    client, code, _, d = draft
+    x, y = d["joints"]["root"]
+    rest = [f'"{k}": {v}' for k, v in d["joints"].items() if k not in ("root", "hip")]
+    if root is not None:
+        rest.append('"root": ' + root.replace("X", str(x)).replace("Y", str(y)))
+    url = f"/api/p/{code}/draft/{d['id']}/joints"
+    for body in ('{"joints": {' + ", ".join(rest) + "}}", '{"joints": [1, 2]}'):
+        r = client.post(url, content=body, headers={"Content-Type": "application/json"})
+        assert r.status_code == 422 and r.json()["error"], r.text
+    assert client.post(url, json={"joints": d["joints"]}).status_code == 200

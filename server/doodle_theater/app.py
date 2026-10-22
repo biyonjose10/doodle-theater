@@ -14,6 +14,7 @@ from importlib.resources import files
 
 import segno
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -22,7 +23,7 @@ from starlette.concurrency import run_in_threadpool
 from . import pipeline, samples, story, vision
 from .story import agent, voice
 from .config import STATIC, public_url
-from .store import Store
+from .store import SessionsFull, Store
 
 log = logging.getLogger("doodle_theater")
 app = FastAPI(title="Doodle Theater")
@@ -38,11 +39,22 @@ def _session_or_404(code: str):
     return s
 
 
+async def _read_upload(file: UploadFile) -> bytes:
+    """The uploaded file, read no further than MAX_PHOTO."""
+    data = await file.read(MAX_PHOTO + 1)
+    if len(data) > MAX_PHOTO:
+        raise HTTPException(413, "That picture is too big. Try a smaller photo.")
+    return data
+
+
 # TV side
 
 @app.post("/api/pair")
 def pair():
-    s = store.new_session()
+    try:
+        s = store.new_session()
+    except SessionsFull:
+        raise HTTPException(503, "Too many TVs are pairing right now. Try again in a minute.")
     url = f"{public_url()}/p/{s.code}"
     return {"code": s.code, "phone_url": url, "qr": f"/api/pair/{s.code}/qr.png"}
 
@@ -115,9 +127,7 @@ def phone_page(code: str):
 @app.post("/api/p/{code}/photo")
 async def photo(code: str, file: UploadFile = File(...)):
     _session_or_404(code)
-    data = await file.read()
-    if len(data) > MAX_PHOTO:
-        raise HTTPException(413, "That photo is too big.")
+    data = await _read_upload(file)
     try:
         return await run_in_threadpool(pipeline.make_draft, data, store.drafts)
     except ValueError as e:
@@ -139,9 +149,7 @@ async def find_drawings(code: str, file: UploadFile = File(...)):
     returned as `draft`. With several, the photo is kept under `upload` for .../pick.
     """
     _session_or_404(code)
-    data = await file.read()
-    if len(data) > MAX_PHOTO:
-        raise HTTPException(413, "That photo is too big.")
+    data = await _read_upload(file)
     try:
         found = await run_in_threadpool(pipeline.candidates, data)
         if len(found) > 1:
@@ -185,9 +193,7 @@ def draft_file(code: str, draft_id: str, name: str):
 async def fix_mask(code: str, draft_id: str, file: UploadFile = File(...)):
     _session_or_404(code)
     _draft_or_404(draft_id)
-    data = await file.read()
-    if len(data) > MAX_PHOTO:
-        raise HTTPException(413, "That picture is too big.")
+    data = await _read_upload(file)
     try:
         return await run_in_threadpool(pipeline.fix_mask, draft_id, data, store.drafts)
     except ValueError as e:
@@ -275,6 +281,13 @@ def media(ep_id: str, name: str):
 @app.exception_handler(HTTPException)
 async def friendly(_, exc: HTTPException):
     return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def friendly_422(_, exc: RequestValidationError):
+    """A malformed request body: the phone shows `error`, so say something a parent can act on."""
+    log.info("bad request: %s", exc.errors())
+    return JSONResponse({"error": "Something didn't come through right. Please try again."}, status_code=422)
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

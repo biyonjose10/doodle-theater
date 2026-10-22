@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import secrets
 import shutil
 import threading
@@ -16,6 +17,13 @@ from .config import DATA
 _LETTERS = "BCDFGHJKLMNPQRSTVWXZ"
 # A photo with several drawings is kept this long, so the child can go back and pick another one.
 UPLOAD_TTL = 3600
+# A pairing code works this long; an evening's play, not forever.
+SESSION_TTL = 2 * 3600
+_CODE_TRIES = 50
+
+
+class SessionsFull(RuntimeError):
+    """No free pairing code was found."""
 
 
 @dataclass
@@ -33,25 +41,30 @@ class Store:
         self.uploads = root / "uploads"
         for d in (self.rigs, self.drafts, self.uploads):
             d.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._sessions: dict[str, Session] = {}
 
     # Pairing
     def new_session(self) -> Session:
         with self._lock:
-            while True:
+            cutoff = time.time() - SESSION_TTL
+            self._sessions = {c: s for c, s in self._sessions.items() if s.created >= cutoff}
+            for _ in range(_CODE_TRIES):
                 code = "".join(secrets.choice(_LETTERS) for _ in range(4))
                 if code not in self._sessions:
                     s = self._sessions[code] = Session(code)
                     return s
+            raise SessionsFull("no free pairing code")
 
     def session(self, code: str) -> Session | None:
-        return self._sessions.get(code.upper())
+        s = self._sessions.get(code.upper())
+        return s if s is not None and time.time() - s.created < SESSION_TTL else None
 
     def push(self, code: str, event: dict) -> None:
         with self._lock:
-            s = self._sessions[code]
-            s.events.append({"n": len(s.events) + 1, **event})
+            s = self._sessions.get(code)
+            if s is not None:  # it may have expired since the request was checked
+                s.events.append({"n": len(s.events) + 1, **event})
 
     def events_after(self, code: str, after: int) -> list[dict]:
         s = self.session(code)
@@ -78,8 +91,15 @@ class Store:
         return self.root / "cast.json"
 
     def cast(self) -> list[dict]:
-        f = self._cast_file()
-        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+        with self._lock:
+            f = self._cast_file()
+            return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+
+    def _save_cast(self, cast: list[dict]) -> None:
+        """Write a whole new file and swap it in, so a reader never sees half of one."""
+        tmp = self.root / "cast.json.tmp"
+        tmp.write_text(json.dumps(cast, indent=1), encoding="utf-8")
+        os.replace(tmp, self._cast_file())
 
     def add_to_cast(self, draft_id: str, name: str, description: str) -> dict:
         with self._lock:
@@ -89,7 +109,7 @@ class Store:
             shutil.copytree(src, dst, ignore=shutil.ignore_patterns("crop.png", "mask.png"))
             entry = {"id": draft_id, "name": name, "description": description, "added": time.time()}
             cast = [c for c in self.cast() if c["id"] != draft_id] + [entry]
-            self._cast_file().write_text(json.dumps(cast, indent=1), encoding="utf-8")
+            self._save_cast(cast)
             return entry
 
     def remove(self, rig_id: str | None = None) -> None:
@@ -106,4 +126,4 @@ class Store:
             elif rig_id.isalnum():
                 # The draft holds the same drawing (and /rigs/ falls back to it), so it goes too.
                 shutil.rmtree(self.drafts / rig_id, ignore_errors=True)
-            self._cast_file().write_text(json.dumps(keep, indent=1), encoding="utf-8")
+            self._save_cast(keep)

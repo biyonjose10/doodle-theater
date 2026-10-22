@@ -33,8 +33,12 @@ def load_image(src: str | Path | np.ndarray | Image.Image, max_side: int = MAX_S
     else:
         im = src if isinstance(src, Image.Image) else Image.open(src)
         im = ImageOps.exif_transpose(im)
-        if im.mode in ("RGBA", "LA", "P"):
-            im = im.convert("RGBA")
+        if im.mode == "F" or im.mode.startswith("I"):
+            # 16-bit and float grey: convert() would clip anything over 255 to white.
+            a = np.asarray(im, np.float64)
+            im = Image.fromarray((a * (255 / 65535 if a.max() > 255 else 1)).clip(0, 255).astype(np.uint8))
+        alpha = im.mode in ("RGBA", "RGBa", "LA", "PA") or "transparency" in im.info
+        im = im.convert("RGBA" if alpha else "RGB")  # CMYK's 4th channel is K, not alpha
         img = np.asarray(im)
     if img.shape[2] == 4:
         alpha = img[..., 3:4].astype(np.float32) / 255.0
@@ -160,7 +164,9 @@ def find_paper(img: np.ndarray) -> Box | None:
     if c is None:
         return None
     x, y, bw, bh = cv2.boundingRect(cv2.convexHull(c))
-    m = int(0.03 * max(bw, bh))
+    m = int(0.03 * min(bw, bh))  # max() would trim a narrow sheet inside out
+    if bw <= 2 * m or bh <= 2 * m:
+        return None
     return x + m, y + m, x + bw - m, y + bh - m
 
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 import base64
 import io
 import json
+import logging
+import math
 import time
 import uuid
 from pathlib import Path
@@ -18,16 +20,43 @@ from doodlerig.segment import Box, extract_character, find_characters, prepare_i
 
 from . import vision
 
+log = logging.getLogger(__name__)
+
 THUMB = 240  # px, longest side of a picker thumbnail
+# A few hundred KB of PNG can decode into gigabytes, so the pixel count is checked before decoding.
+MAX_PIXELS = 40_000_000
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS  # Pillow's own guard, for any decode that skips _open
+NOT_A_PHOTO = "That doesn't look like a photo. Try taking it again."
+NO_DRAWING = "I couldn't find a drawing. Try plain white paper, a dark outline, and good light."
 
 
-def _open(photo: bytes) -> Image.Image:
+def _open(photo: bytes, expect: tuple[int, int] | None = None) -> Image.Image:
+    """Decode an uploaded picture, refusing a huge one (or one not `expect` = (w, h)) before decoding it."""
     try:
-        im = Image.open(io.BytesIO(photo))
-        im.load()
+        im = Image.open(io.BytesIO(photo))  # reads the header only
     except (OSError, Image.DecompressionBombError):
-        raise ValueError("That doesn't look like a photo. Try taking it again.")
+        raise ValueError(NOT_A_PHOTO)
+    # Checking here rather than via DecompressionBombWarning: warning filters aren't thread-safe.
+    if im.width * im.height > MAX_PIXELS:
+        raise ValueError("That picture is too big. Try a smaller photo.")
+    if expect is not None and im.size != expect:
+        raise ValueError(f"The painted cut-out is {im.size[0]}x{im.size[1]}, expected {expect[0]}x{expect[1]}.")
+    try:
+        im.load()
+    except OSError:
+        raise ValueError(NOT_A_PHOTO)
     return im
+
+
+def _segmented(step, *args, **kwargs):
+    """Run a segmentation step; a photo it can't cope with is a retake for the child, not a 500."""
+    try:
+        return step(*args, **kwargs)
+    except ValueError:
+        raise
+    except Exception:
+        log.exception("segmentation failed")
+        raise ValueError(NO_DRAWING)
 
 
 def _save_draft(rig: Rig, crop: np.ndarray, mask: np.ndarray, folder: Path) -> None:
@@ -60,16 +89,17 @@ def _thumb(img: np.ndarray, box: Box) -> str:
 
 def candidates(photo: bytes) -> list[dict]:
     """Every drawing on the photo, biggest first: {box, thumb}. Boxes are what make_draft takes."""
-    img = prepare_image(_open(photo))
-    return [{"box": [int(v) for v in b], "thumb": _thumb(img, b)} for b in find_characters(_open(photo))]
+    img = _segmented(prepare_image, _open(photo))
+    return [{"box": [int(v) for v in b], "thumb": _thumb(img, b)}
+            for b in _segmented(find_characters, _open(photo))]
 
 
 def make_draft(photo: bytes, drafts: Path, box: Box | None = None) -> dict:
     """Cut out and rig one drawing: the one in `box` (from `candidates`), else the biggest."""
     t0 = time.perf_counter()
-    crop, mask = extract_character(_open(photo), box=None if box is None else tuple(box))
+    crop, mask = _segmented(extract_character, _open(photo), box=None if box is None else tuple(box))
     if not mask.any() or mask.mean() < 255 * 0.02:
-        raise ValueError("I couldn't find a drawing. Try plain white paper, a dark outline, and good light.")
+        raise ValueError(NO_DRAWING)
     info: dict = {}
     joints = vision.provider(crop, mask, info)
     rig = rig_from_mask(crop, mask, joints, info.get("description", ""),
@@ -82,6 +112,8 @@ def make_draft(photo: bytes, drafts: Path, box: Box | None = None) -> dict:
 
 def fix_joints(draft_id: str, joints: dict, drafts: Path) -> dict:
     """Rebuild a draft with joints the parent dragged (texture coordinates)."""
+    if "root" not in joints or not all(len(v) == 2 and all(map(math.isfinite, v)) for v in joints.values()):
+        raise ValueError("Those joints didn't come through right. Try dragging them again.")
     t0 = time.perf_counter()
     folder = drafts / draft_id
     old = Rig.load(folder)
@@ -89,7 +121,7 @@ def fix_joints(draft_id: str, joints: dict, drafts: Path) -> dict:
     crop = np.asarray(Image.open(folder / "crop.png").convert("RGB"))
     mask = np.asarray(Image.open(folder / "mask.png").convert("L"))
     in_crop = {k: (float(v[0]) + ox, float(v[1]) + oy) for k, v in joints.items()}
-    in_crop["hip"] = in_crop.get("root", in_crop.get("hip"))
+    in_crop["hip"] = in_crop["root"]
     rig = rig_from_mask(crop, mask, in_crop, old.description, {"joints_from": "parent"})
     _save_draft(rig, crop, mask, folder)
     return describe(rig, draft_id, time.perf_counter() - t0)
@@ -99,10 +131,7 @@ def fix_joints(draft_id: str, joints: dict, drafts: Path) -> dict:
 
 def _read_mask(data: bytes, shape: tuple[int, int]) -> np.ndarray:
     """A painted mask (white = keep; black or transparent = drop) as uint8 0/255 of crop size."""
-    im = _open(data)
-    h, w = shape
-    if im.size != (w, h):
-        raise ValueError(f"The painted cut-out is {im.size[0]}x{im.size[1]}, expected {w}x{h}.")
+    im = _open(data, expect=shape[::-1])
     keep = np.asarray(im.convert("L")) > 127
     if "A" in im.getbands():
         keep &= np.asarray(im.getchannel("A")) > 127

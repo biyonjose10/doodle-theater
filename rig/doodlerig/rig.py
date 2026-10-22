@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-import cv2
 import numpy as np
 from PIL import Image
 

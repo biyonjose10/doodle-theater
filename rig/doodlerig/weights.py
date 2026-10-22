@@ -88,4 +88,6 @@ def compute_weights(vertices: np.ndarray, triangles: np.ndarray, joints: Joints,
     w = np.exp(-(best - best[:, :1]) / falloff)
     w /= w.sum(axis=1, keepdims=True)
     idx = np.array(drivers)[order]
-    return idx.astype(np.int32), w.astype(np.float32)
+    # With a single driver there is one column; the rig format always has MAX_INFLUENCES.
+    pad = ((0, 0), (0, MAX_INFLUENCES - idx.shape[1]))
+    return np.pad(idx, pad).astype(np.int32), np.pad(w, pad).astype(np.float32)

@@ -23,7 +23,7 @@ def _fake_marks(text: str, sent: str, starts: list[int]) -> list[dict]:
 def test_speech_marks_map_back_to_plain_text(bedtime):
     text = "Fish & chips <3 for the café, said naïve Pip."
     sent, starts = polly_input(text, bedtime)
-    marks = to_char_marks(_fake_marks(text, sent, starts), starts)
+    marks = to_char_marks(_fake_marks(text, sent, starts), starts, text)
     assert [text[m["start"]:m["end"]] for m in marks] == ["Fish", "&", "chips", "<3", "café", "naïve"]
 
 
@@ -41,7 +41,19 @@ def test_real_polly_shaped_marks_with_utf8():
     sent, starts = polly_input("Hi café!", True)
     p = len(BEDTIME_OPEN)
     raw = [{"time": 6, "start": p, "end": p + 2}, {"time": 200, "start": p + 3, "end": p + 8}]
-    assert to_char_marks(raw, starts) == [{"time": 6, "start": 0, "end": 2}, {"time": 200, "start": 3, "end": 7}]
+    assert to_char_marks(raw, starts, "Hi café!") == [{"time": 6, "start": 0, "end": 2}, {"time": 200, "start": 3, "end": 7}]
+
+
+@pytest.mark.parametrize("bedtime", [False, True])
+def test_marks_after_an_emoji_count_utf16_units_like_the_tv(bedtime):
+    # The TV highlights with Kotlin's substring, which counts UTF-16 units: the rocket is two.
+    text = "Go 🚀 Pip go!"
+    sent, starts = polly_input(text, bedtime)
+    raw = [{"time": 0, "start": starts[0], "end": starts[2]},    # Go
+           {"time": 100, "start": starts[5], "end": starts[8]}]  # Pip
+    marks = to_char_marks(raw, starts, text)
+    utf16 = text.encode("utf-16-le")
+    assert [utf16[2 * m["start"]:2 * m["end"]].decode("utf-16-le") for m in marks] == ["Go", "Pip"]
 
 
 @pytest.mark.parametrize("theme", sorted(BACKDROPS))
