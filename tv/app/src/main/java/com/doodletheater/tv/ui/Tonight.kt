@@ -1,6 +1,7 @@
 package com.doodletheater.tv.ui
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,8 +22,8 @@ import java.util.Calendar
  * "Stories tonight": a parent's limit on how many stories play per day (0 = no limit).
  * The count resets each morning at 06:00, so a late story still counts towards that night.
  */
-class Tonight(context: Context) {
-    private val prefs = context.getSharedPreferences("tonight", Context.MODE_PRIVATE)
+class Tonight(private val prefs: SharedPreferences, private val now: () -> Long = System::currentTimeMillis) {
+    constructor(context: Context) : this(context.getSharedPreferences("tonight", Context.MODE_PRIVATE))
 
     var limit: Int
         get() = prefs.getInt("limit", 0)
@@ -41,7 +42,7 @@ class Tonight(context: Context) {
 
     /** The calendar day a night belongs to: hours before 06:00 count as the previous evening. */
     private fun night(): String {
-        val c = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, -6) }
+        val c = Calendar.getInstance().apply { timeInMillis = now(); add(Calendar.HOUR_OF_DAY, -6) }
         return "${c.get(Calendar.YEAR)}-${c.get(Calendar.DAY_OF_YEAR)}"
     }
 

@@ -1,7 +1,6 @@
 package com.doodletheater.tv.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +31,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,7 +60,7 @@ fun ParentCorner(
     onCycleLimit: () -> Unit,
 ) {
     var cast by remember { mutableStateOf<List<CastMember>>(emptyList()) }
-    var thumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
+    var thumbs by remember { mutableStateOf<Map<String, ImageBitmap?>>(emptyMap()) }
     var status by remember { mutableStateOf<String?>(null) }
     var confirming by remember { mutableStateOf<CastMember?>(null) }
     val firstStar = remember { FocusRequester() }
@@ -72,7 +70,7 @@ fun ParentCorner(
     suspend fun load() {
         runCatching { api.cast() }.onSuccess { list ->
             cast = list.reversed()
-            thumbs = list.associate { m -> m.id to api.image("/rigs/${m.id}/texture.png") }
+            thumbs = api.thumbnails(list)     // a broken drawing shows a placeholder; the rest still load
         }.onFailure { status = "Can't reach the laptop at ${api.base}." }
     }
 
@@ -100,7 +98,7 @@ fun ParentCorner(
                         modifier = if (m == cast.first()) Modifier.focusRequester(firstStar) else Modifier) {
                         Column(Modifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(Modifier.weight(1f).fillMaxWidth().background(Ink.paper, RoundedCornerShape(8.dp)).padding(3.dp)) {
-                                thumbs[m.id]?.let { Image(it, m.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+                                StarThumb(thumbs[m.id], m.name, failed = m.id in thumbs)
                             }
                             Text(m.name, fontFamily = Baloo, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Ink.ink, maxLines = 1)
                             TagPill("🗑 Delete", color = Color(0xFF9A3A22), size = 9)

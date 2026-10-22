@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
 import androidx.tv.material3.Text
 import com.doodletheater.tv.R
+import com.doodletheater.tv.net.HttpError
 import com.doodletheater.tv.net.Pairing
 import com.doodletheater.tv.net.ServerApi
 import com.doodletheater.tv.rig.RigStore
@@ -130,15 +131,23 @@ fun AddStar(api: ServerApi) {
     }
 
     LaunchedEffect(Unit) {
-        val p = runCatching { api.pair() }.getOrElse {
-            status = "Can't reach the Doodle Theater server. Is the laptop on?"; return@LaunchedEffect
-        }
-        pairing = p
-        status = "Waiting for a drawing…"
+        var p: Pairing? = null
         var after = 0
         while (true) {
-            val news = runCatching { api.events(p.code, after) }.getOrDefault(emptyList())
-            for ((n, member) in news) {
+            val current = p ?: runCatching { api.pair() }.getOrNull()
+            if (current == null) {
+                status = "Can't reach the Doodle Theater server. Is the laptop on?"
+                delay(3000); continue
+            }
+            if (current !== p) {
+                // First time in, or the laptop's server restarted and forgot our code: show the fresh one.
+                p = current; pairing = current; after = 0
+                status = "Waiting for a drawing…"
+            }
+            val polled = runCatching { api.events(current.code, after) }
+            val gone = (polled.exceptionOrNull() as? HttpError)?.code == 404
+            if (gone) { p = null; delay(500); continue }   // a dead code: pair again and show the new QR
+            for ((n, member) in polled.getOrDefault(emptyList())) {
                 after = n
                 arrive(member)
             }

@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
-private val ADDRESS = Regex("""^https?://(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{4})$""")
+private val ADDRESS = Regex("""^https?://(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})$""")
 
 /**
  * "Set server address": the laptop's IP and port as 16 digit wheels, so a remote with only a
@@ -69,15 +69,16 @@ fun ServerSetup(api: ServerApi, onDone: () -> Unit) {
 
     LaunchedEffect(Unit) { runCatching { delay(100); first.requestFocus() } }
 
-    fun octet(g: Int) = digits[g * 3] * 100 + digits[g * 3 + 1] * 10 + digits[g * 3 + 2]
-    fun port() = digits.subList(12, 16).fold(0) { a, d -> a * 10 + d }
-    fun address() = "http://" + (0 until 4).joinToString(".") { octet(it).toString() } + ":" + port()
+    fun octet(g: Int) = octetOf(digits, g)
+    fun port() = portOf(digits)
+    fun address() = addressOf(digits)
 
     fun connect() {
         if (busy) return
         if ((0 until 4).any { octet(it) > 255 }) { status = "Each of the four numbers must be 255 or less."; return }
         if (port() == 0) { status = "The port can't be 0000 (the server uses 8787)."; return }
-        val url = address()
+        // Saved exactly as normalise() writes it ("0080" -> ":80"), so the wheels show the same address next time.
+        val url = ServerConfig.normalise(address()) ?: run { status = "That address doesn't look right."; return }
         ServerConfig.save(context, url)
         busy = true
         status = "Trying $url…"
@@ -183,10 +184,18 @@ private fun DigitWheel(value: Int, onChange: (Int) -> Unit, onTyped: () -> Unit,
     }
 }
 
-private fun digitsOf(url: String): List<Int>? {
+internal fun octetOf(digits: List<Int>, g: Int) = digits[g * 3] * 100 + digits[g * 3 + 1] * 10 + digits[g * 3 + 2]
+internal fun portOf(digits: List<Int>) = digits.subList(12, 16).fold(0) { a, d -> a * 10 + d }
+/** What the 16 wheels say, e.g. 192 168 001 005 : 0080 -> "http://192.168.1.5:80". */
+internal fun addressOf(digits: List<Int>) =
+    "http://" + (0 until 4).joinToString(".") { octetOf(digits, it).toString() } + ":" + portOf(digits)
+
+/** The 16 wheels for "http://a.b.c.d:port"; null unless it's an IPv4 address whose port fits the 4 port wheels. */
+internal fun digitsOf(url: String): List<Int>? {
     val m = ADDRESS.matchEntire(url) ?: return null
     val (a, b, c, d, port) = m.destructured
-    return (listOf(a, b, c, d).joinToString("") { it.padStart(3, '0') } + port).map { it - '0' }
+    if (listOf(a, b, c, d).any { it.toInt() > 255 } || port.toInt() !in 1..9999) return null
+    return (listOf(a, b, c, d).joinToString("") { it.padStart(3, '0') } + port.padStart(4, '0')).map { it - '0' }
 }
 
 /** The saved address; else, on a real TV, this TV's own Wi-Fi address (same network, fix the last number). */

@@ -74,7 +74,7 @@ fun Home(
     onCycleLimit: () -> Unit = {},
 ) {
     var cast by remember { mutableStateOf<List<CastMember>>(emptyList()) }
-    var thumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
+    var thumbs by remember { mutableStateOf<Map<String, ImageBitmap?>>(emptyMap()) }
     var offline by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
     var samplesBusy by remember { mutableStateOf(false) }
@@ -85,8 +85,9 @@ fun Home(
     suspend fun load() {
         runCatching { api.cast() }.onSuccess { list ->
             cast = list.reversed()
-            thumbs = list.associate { m -> m.id to api.image("/rigs/${m.id}/texture.png") }
             offline = false
+            loaded = true
+            thumbs = api.thumbnails(list)     // one broken drawing gets a placeholder; it doesn't mean "offline"
         }.onFailure { offline = true }
         loaded = true
     }
@@ -159,7 +160,7 @@ fun Home(
                     Column(Modifier.fillMaxSize().padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         // The drawing sits on its own paper mat, like a sticker on a page.
                         Box(Modifier.weight(1f).fillMaxWidth().background(Ink.paper, RoundedCornerShape(9.dp)).padding(4.dp)) {
-                            thumbs[m.id]?.let { Image(it, m.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+                            StarThumb(thumbs[m.id], m.name, failed = m.id in thumbs)
                             if (focused) TagPill("★ Selected", Modifier.align(Alignment.TopStart), color = Ink.ink.copy(alpha = 0.85f), size = 8)
                         }
                         Spacer(Modifier.height(4.dp))
@@ -223,6 +224,15 @@ fun TvCard(
         ),
         glow = CardDefaults.glow(focusedGlow = Glow(Ink.accent.copy(alpha = 0.55f), 14.dp)),
     ) { content() }
+}
+
+/** A star's drawing on its card; a crayon stands in when the drawing couldn't be fetched ([failed]). */
+@Composable
+fun StarThumb(image: ImageBitmap?, name: String, failed: Boolean) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (image != null) Image(image, name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+        else if (failed) Text("🖍", fontSize = 26.sp, color = Ink.soft)
+    }
 }
 
 /** A small ink tag, e.g. "★ Selected" on a focused card or above the star in the spotlight. */

@@ -9,6 +9,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.doodletheater.tv.net.ServerApi
 import com.doodletheater.tv.story.StoryPlayer
 import kotlinx.coroutines.delay
@@ -35,19 +37,27 @@ fun App(start: Screen = Screen.Home) {
     // A manual choice holds until the clock itself crosses the boundary, then the schedule takes over again.
     var scheduled by remember { mutableStateOf(isBedtimeHour()) }
     var manual by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30_000)
-            val now = isBedtimeHour()
-            if (now != scheduled) { scheduled = now; manual = null }
-        }
-    }
-    val bedtime = manual ?: scheduled
 
     // A parent's "stories tonight" limit; every story that starts (including Watch again) counts.
     val tonight = remember { Tonight(context.applicationContext) }
     var limit by remember { mutableStateOf(tonight.limit) }
     var left by remember { mutableStateOf(tonight.left) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            val now = isBedtimeHour()
+            if (now != scheduled) { scheduled = now; manual = null }
+            left = tonight.left           // the count resets at 06:00 even if the app stays open all night
+        }
+    }
+    // Back from the Fire TV home screen (or the TV waking up): re-read both straight away.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        val now = isBedtimeHour()
+        if (now != scheduled) { scheduled = now; manual = null }
+        left = tonight.left
+    }
+    val bedtime = manual ?: scheduled
     fun storyStarted() { tonight.markWatched(); left = tonight.left }
     fun cycleLimit() {
         val choices = Tonight.CHOICES

@@ -216,8 +216,9 @@ fun StoryPlayer(
                 val hit = pending.firstOrNull { it.atWord!!.lowercase() == w }
                 if (hit != null) { pending.remove(hit); perform(hit, clock[0]) }
             }
-            if (b.audio != null) narrator.play(api.url(b.audio), b.marks, onWord)
-            else narrator.speak(b.text, pitch, if (b.speaker == "narrator") 0.92f else 1.0f, onWord)
+            // No Polly clip, or it couldn't be fetched (laptop asleep, missing mp3): the TV's own voice reads it.
+            if (b.audio == null || !narrator.play(api.url(b.audio), b.marks, onWord))
+                narrator.speak(b.text, pitch, if (b.speaker == "narrator") 0.92f else 1.0f, onWord)
         } while (paused)
         android.util.Log.d("DoodleStory", "beat ${(System.nanoTime() - t0) / 1_000_000} ms, $words word events, " +
             "${pending.size} late actions: ${b.text.take(40)}")
