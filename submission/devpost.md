@@ -117,7 +117,7 @@ network or a model call fails.
 - A photo of a paper drawing becomes a puppet that moves live on a TV, not a rendered video.
 - The story agent checks its own work with the TV's validator before anything reaches a child.
 - The whole show still runs on a home network with no AWS account and no internet.
-- doodlerig stands on its own as an MIT library with 36 passing tests, plus 6 marked as known gaps.
+- doodlerig stands on its own as an MIT library with 49 passing tests, plus 6 marked as known gaps.
 
 ## What we learned
 
@@ -194,7 +194,7 @@ transparent texture.
   instead of leaking, and pale crayon is found by colour, not just darkness. Edges are
   anti-aliased. `find_characters()` returns every drawing on a sheet, and
   `extract_character(box=...)` cuts out the chosen one.
-- **36 passing tests, plus 6 marked as known gaps:** segmentation against reference masks, synthetic
+- **49 passing tests, plus 6 marked as known gaps:** segmentation against reference masks, synthetic
   photos with known true shapes (shadows, gaps, pale crayon, two drawings on one sheet), joints near hand-made annotations, mesh
   inside the drawing, normalised weights, every motion, save/load round-trips, and
   JavaScript-vs-Python posing parity.
